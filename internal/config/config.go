@@ -14,26 +14,27 @@ import (
 )
 
 type Config struct {
-	Runtime        Runtime        `mapstructure:"-"`
-	App            App            `mapstructure:"app"`
-	HTTP           HTTP           `mapstructure:"http"`
-	GRPC           GRPC           `mapstructure:"grpc"`
-	Log            Log            `mapstructure:"log"`
-	Database       Database       `mapstructure:"database"`
-	Redis          Redis          `mapstructure:"redis"`
-	Health         Health         `mapstructure:"health"`
-	RateLimit      RateLimit      `mapstructure:"rate_limit"`
-	Observability  Observability  `mapstructure:"observability"`
-	Swagger        Swagger        `mapstructure:"swagger"`
-	JWT            JWT            `mapstructure:"jwt"`
-	Auth           Auth           `mapstructure:"auth"`
-	Cron           Cron           `mapstructure:"cron"`
-	Migration      Migration      `mapstructure:"migration"`
-	User           User           `mapstructure:"user"`
-	Idempotency    Idempotency    `mapstructure:"idempotency"`
-	Outbound       Outbound       `mapstructure:"outbound"`
-	EventBus       EventBus       `mapstructure:"event_bus"`
-	ProviderClient ProviderClient `mapstructure:"provider_client"`
+	Runtime         Runtime         `mapstructure:"-"`
+	App             App             `mapstructure:"app"`
+	HTTP            HTTP            `mapstructure:"http"`
+	GRPC            GRPC            `mapstructure:"grpc"`
+	Log             Log             `mapstructure:"log"`
+	Database        Database        `mapstructure:"database"`
+	Redis           Redis           `mapstructure:"redis"`
+	Health          Health          `mapstructure:"health"`
+	RateLimit       RateLimit       `mapstructure:"rate_limit"`
+	Observability   Observability   `mapstructure:"observability"`
+	Swagger         Swagger         `mapstructure:"swagger"`
+	JWT             JWT             `mapstructure:"jwt"`
+	Auth            Auth            `mapstructure:"auth"`
+	Cron            Cron            `mapstructure:"cron"`
+	Migration       Migration       `mapstructure:"migration"`
+	User            User            `mapstructure:"user"`
+	Idempotency     Idempotency     `mapstructure:"idempotency"`
+	Outbound        Outbound        `mapstructure:"outbound"`
+	EventBus        EventBus        `mapstructure:"event_bus"`
+	ProviderClient  ProviderClient  `mapstructure:"provider_client"`
+	ServiceRegistry ServiceRegistry `mapstructure:"service_registry"`
 }
 
 type Runtime struct {
@@ -254,6 +255,15 @@ type ProviderClient struct {
 	Retry              Retry     `mapstructure:"retry"`
 	Breaker            Breaker   `mapstructure:"breaker"`
 }
+type ServiceRegistry struct {
+	Enabled           bool          `mapstructure:"enabled"`
+	Target            string        `mapstructure:"target"`
+	PSK               string        `mapstructure:"psk"`
+	AllowInsecure     bool          `mapstructure:"allow_insecure"`
+	MaxStale          time.Duration `mapstructure:"max_stale"`
+	SnapshotDirectory string        `mapstructure:"snapshot_directory"`
+	TLS               ClientTLS     `mapstructure:"tls"`
+}
 
 func Load(path string) (Config, error) { return LoadWithProfile(path, "") }
 
@@ -436,6 +446,10 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("provider_client.breaker.enabled", true)
 	v.SetDefault("provider_client.breaker.failure_threshold", 5)
 	v.SetDefault("provider_client.breaker.open_timeout", "30s")
+	v.SetDefault("service_registry.enabled", false)
+	v.SetDefault("service_registry.target", "127.0.0.1:9095")
+	v.SetDefault("service_registry.max_stale", "2m")
+	v.SetDefault("service_registry.snapshot_directory", "data/registry-cache")
 	v.SetDefault("outbound.http", map[string]any{})
 	v.SetDefault("outbound.grpc", map[string]any{})
 }
@@ -565,6 +579,17 @@ func (c Config) Validate() error {
 		}
 		if err := validateClientPolicy("provider_client", auth, c.ProviderClient.Retry, c.ProviderClient.Breaker, c.ProviderClient.TLS); err != nil {
 			return err
+		}
+	}
+	if c.ServiceRegistry.Enabled {
+		if c.ServiceRegistry.Target == "" || len(c.ServiceRegistry.PSK) < 32 || c.ServiceRegistry.MaxStale <= 0 || c.ServiceRegistry.SnapshotDirectory == "" {
+			return errors.New("enabled service_registry requires target, PSK, max_stale, and snapshot directory")
+		}
+		if c.App.Env == "production" && (!c.ServiceRegistry.TLS.Enabled || c.ServiceRegistry.AllowInsecure) {
+			return errors.New("production service_registry requires TLS")
+		}
+		if !c.ServiceRegistry.TLS.Enabled && !c.ServiceRegistry.AllowInsecure {
+			return errors.New("service_registry without TLS requires explicit allow_insecure")
 		}
 	}
 	for name, upstream := range c.Outbound.HTTP {

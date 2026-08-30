@@ -96,6 +96,14 @@ func (s *Service) Get(ctx context.Context, tenantID, code string) (Dictionary, e
 	if errors.Is(err, ErrNotFound) && tenantID != "" {
 		value, err = s.repository.GetDictionary(ctx, "", code)
 	}
+	if errors.Is(err, ErrNotFound) {
+		if resolver, ok := s.gateway.(ProviderResolver); ok {
+			provider, _, resolveErr := resolver.ResolveProvider(ctx, code)
+			if resolveErr == nil {
+				return Dictionary{Code: code, Name: code, Kind: KindDynamic, Status: StatusActive, ProviderID: provider.ID, MetadataJSON: "{}"}, nil
+			}
+		}
+	}
 	return value, translate(err)
 }
 
@@ -559,6 +567,16 @@ func (s *Service) dynamicProvider(ctx context.Context, dictionary Dictionary, se
 	if s.gateway == nil {
 		return Provider{}, Capability{}, apperror.Unavailable("dynamic dictionary gateway is disabled", nil)
 	}
+	if resolver, ok := s.gateway.(ProviderResolver); ok {
+		provider, capability, err := resolver.ResolveProvider(ctx, dictionary.Code)
+		if err != nil {
+			return Provider{}, Capability{}, providerError(err)
+		}
+		if err := validateSearchCapability(search, capability); err != nil {
+			return Provider{}, Capability{}, err
+		}
+		return provider, capability, nil
+	}
 	provider, err := s.repository.GetProvider(ctx, dictionary.ProviderID)
 	if err != nil {
 		return Provider{}, Capability{}, translate(err)
@@ -574,18 +592,24 @@ func (s *Service) dynamicProvider(ctx context.Context, dictionary Dictionary, se
 		if capability.DictionaryCode != dictionary.Code {
 			continue
 		}
-		if search.Keyword != "" && !capability.SupportsSearch {
-			return Provider{}, Capability{}, apperror.Invalid("dynamic dictionary does not support search", nil)
-		}
-		if search.Cursor != "" && !capability.SupportsCursor {
-			return Provider{}, Capability{}, apperror.Invalid("dynamic dictionary does not support cursor pagination", nil)
-		}
-		if !keysAllowed(search.Filters, capability.FilterKeys) || (search.Sort != "" && !contains(capability.SortKeys, search.Sort)) {
-			return Provider{}, Capability{}, apperror.Invalid("unsupported provider filter or sort", nil)
+		if err := validateSearchCapability(search, capability); err != nil {
+			return Provider{}, Capability{}, err
 		}
 		return provider, capability, nil
 	}
 	return Provider{}, Capability{}, apperror.Unavailable("dynamic dictionary capability is not registered", nil)
+}
+func validateSearchCapability(search Search, capability Capability) error {
+	if search.Keyword != "" && !capability.SupportsSearch {
+		return apperror.Invalid("dynamic dictionary does not support search", nil)
+	}
+	if search.Cursor != "" && !capability.SupportsCursor {
+		return apperror.Invalid("dynamic dictionary does not support cursor pagination", nil)
+	}
+	if !keysAllowed(search.Filters, capability.FilterKeys) || (search.Sort != "" && !contains(capability.SortKeys, search.Sort)) {
+		return apperror.Invalid("unsupported provider filter or sort", nil)
+	}
+	return nil
 }
 func keysAllowed(values map[string]string, allowed []string) bool {
 	for key := range values {

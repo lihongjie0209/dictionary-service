@@ -24,3 +24,8 @@ provider_client:
   enabled: true
   psk: dictionary-provider-dev-psk-0000000000000000
   allow_insecure: true
+service_registry:
+  enabled: true
+  target: service-registry-service:9090
+  psk: registry-dev-psk-00000000000000000000
+  allow_insecure: true

@@ -144,6 +144,15 @@ provider_client:
   retry: {max_attempts: 2, initial_backoff: 100ms, max_backoff: 1s, methods: [/platform.dictionary.v1.DictionaryProviderService/*]}
   breaker: {enabled: true, failure_threshold: 5, open_timeout: 30s}
 
+service_registry:
+  enabled: false
+  target: 127.0.0.1:9095
+  psk: ""
+  allow_insecure: false
+  max_stale: 2m
+  snapshot_directory: data/registry-cache
+  tls: {enabled: false, server_name: "", ca_file: "", cert_file: "", key_file: ""}
+
 # Named outbound clients. Put environment-specific endpoints and credentials in
 # config-{env}.yaml or APP_ variables.
 outbound:

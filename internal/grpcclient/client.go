@@ -74,8 +74,19 @@ func Dial(cfg Config) (*grpc.ClientConn, error) {
 	if cfg.Retry.MaxAttempts > 1 {
 		interceptors = append(interceptors, retryInterceptor(cfg.Retry))
 	}
-	options := []grpc.DialOption{grpc.WithTransportCredentials(transport), grpc.WithStatsHandler(otelgrpc.NewClientHandler()), grpc.WithChainUnaryInterceptor(interceptors...)}
+	options := []grpc.DialOption{grpc.WithTransportCredentials(transport), grpc.WithStatsHandler(otelgrpc.NewClientHandler()), grpc.WithChainUnaryInterceptor(interceptors...), grpc.WithChainStreamInterceptor(metadataStreamInterceptor(cfg.Token, cfg.PSK))}
 	return grpc.NewClient(cfg.Target, options...)
+}
+
+func metadataStreamInterceptor(token, psk string) grpc.StreamClientInterceptor {
+	return func(ctx context.Context, desc *grpc.StreamDesc, connection *grpc.ClientConn, method string, streamer grpc.Streamer, options ...grpc.CallOption) (grpc.ClientStream, error) {
+		if psk != "" {
+			ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "PSK "+psk)
+		} else if token != "" {
+			ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+token)
+		}
+		return streamer(ctx, desc, connection, method, options...)
+	}
 }
 
 func retryInterceptor(cfg config.Retry) grpc.UnaryClientInterceptor {

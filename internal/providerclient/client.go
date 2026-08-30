@@ -4,19 +4,24 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/lihongjie0209/dictionary-service/internal/config"
 	"github.com/lihongjie0209/dictionary-service/internal/dictionary"
 	"github.com/lihongjie0209/dictionary-service/internal/grpcclient"
 	"github.com/lihongjie0209/dictionary-service/internal/observability"
+	"github.com/lihongjie0209/microservice-platform-go/serviceregistry"
 	commonv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/common/v1"
 	dictionaryv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/dictionary/v1"
+	registryv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/registry/v1"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/fx"
 	"google.golang.org/grpc"
@@ -30,18 +35,83 @@ type connection struct {
 }
 
 type Client struct {
-	config  config.ProviderClient
-	redis   *redis.Client
-	metrics *observability.Metrics
-	mu      sync.Mutex
-	clients map[string]connection
-	dial    func(grpcclient.Config) (*grpc.ClientConn, error)
+	config       config.ProviderClient
+	redis        *redis.Client
+	metrics      *observability.Metrics
+	mu           sync.Mutex
+	clients      map[string]connection
+	dial         func(grpcclient.Config) (*grpc.ClientConn, error)
+	discovery    *serviceregistry.Discovery
+	registryConn *grpc.ClientConn
+	cursor       atomic.Uint64
 }
 
-func New(lc fx.Lifecycle, cfg config.Config, redisClient *redis.Client, metrics *observability.Metrics) *Client {
+func New(lc fx.Lifecycle, cfg config.Config, redisClient *redis.Client, metrics *observability.Metrics) (*Client, error) {
 	client := &Client{config: cfg.ProviderClient, redis: redisClient, metrics: metrics, clients: map[string]connection{}, dial: grpcclient.Dial}
+	if cfg.ServiceRegistry.Enabled {
+		connection, err := grpcclient.Dial(grpcclient.Config{Name: "service-registry-service", Target: cfg.ServiceRegistry.Target, Timeout: 3 * time.Second, PSK: cfg.ServiceRegistry.PSK, TLS: grpcclient.TLSConfig{Enabled: cfg.ServiceRegistry.TLS.Enabled, ServerName: cfg.ServiceRegistry.TLS.ServerName, CAFile: cfg.ServiceRegistry.TLS.CAFile, CertFile: cfg.ServiceRegistry.TLS.CertFile, KeyFile: cfg.ServiceRegistry.TLS.KeyFile, AllowInsecureToken: cfg.ServiceRegistry.AllowInsecure}})
+		if err != nil {
+			return nil, fmt.Errorf("dial service registry: %w", err)
+		}
+		client.registryConn = connection
+		discovery, err := serviceregistry.NewDiscovery(registryv1.NewRegistryServiceClient(connection), serviceregistry.DiscoveryConfig{Selector: map[string]string{"platform.dictionary.provider": "true"}, MaxStale: cfg.ServiceRegistry.MaxStale, SnapshotStore: serviceregistry.FileSnapshotStore{Directory: cfg.ServiceRegistry.SnapshotDirectory}})
+		if err != nil {
+			_ = connection.Close()
+			return nil, err
+		}
+		client.discovery = discovery
+		var cancel context.CancelFunc
+		lc.Append(fx.Hook{OnStart: func(context.Context) error {
+			var runCtx context.Context
+			runCtx, cancel = context.WithCancel(context.Background())
+			go func() { _ = discovery.Run(runCtx) }()
+			return nil
+		}, OnStop: func(context.Context) error {
+			if cancel != nil {
+				cancel()
+			}
+			return nil
+		}})
+	}
 	lc.Append(fx.StopHook(func() error { return client.Close() }))
-	return client
+	return client, nil
+}
+
+func (c *Client) ResolveProvider(_ context.Context, code string) (dictionary.Provider, dictionary.Capability, error) {
+	if c.discovery == nil {
+		return dictionary.Provider{}, dictionary.Capability{}, errors.New("service registry discovery is disabled")
+	}
+	instances, err := c.discovery.Instances()
+	if err != nil {
+		return dictionary.Provider{}, dictionary.Capability{}, err
+	}
+	type candidate struct {
+		instance   *registryv1.ServiceInstance
+		capability dictionary.Capability
+	}
+	candidates := make([]candidate, 0)
+	for _, instance := range instances {
+		var capabilities []dictionary.Capability
+		if json.Unmarshal([]byte(instance.Metadata["platform.dictionary.capabilities"]), &capabilities) != nil {
+			continue
+		}
+		for _, capability := range capabilities {
+			if capability.DictionaryCode == code {
+				candidates = append(candidates, candidate{instance, capability})
+			}
+		}
+	}
+	if len(candidates) == 0 {
+		return dictionary.Provider{}, dictionary.Capability{}, errors.New("dynamic dictionary capability is not registered")
+	}
+	selected := candidates[(c.cursor.Add(1)-1)%uint64(len(candidates))]
+	target := strings.TrimPrefix(strings.TrimPrefix(selected.instance.Endpoint, "grpc://"), "grpcs://")
+	cacheTTL, _ := strconv.Atoi(selected.instance.Metadata["platform.dictionary.cache_ttl_seconds"])
+	timeout, _ := strconv.Atoi(selected.instance.Metadata["platform.dictionary.timeout_milliseconds"])
+	if timeout <= 0 {
+		timeout = 3000
+	}
+	return dictionary.Provider{ID: selected.instance.InstanceId, ServiceName: selected.instance.ServiceName, Target: target, Status: dictionary.StatusActive, CapabilitiesJSON: selected.instance.Metadata["platform.dictionary.capabilities"], CacheTTLSeconds: int32(cacheTTL), TimeoutMilliseconds: int32(timeout), LeaseExpiresAt: selected.instance.LeaseExpiresAt.AsTime()}, selected.capability, nil
 }
 
 func (c *Client) ValidateTarget(target string) error {
@@ -201,6 +271,11 @@ func (c *Client) Close() error {
 		}
 	}
 	c.clients = map[string]connection{}
+	if c.registryConn != nil {
+		if err := c.registryConn.Close(); err != nil && closeErr == nil {
+			closeErr = err
+		}
+	}
 	return closeErr
 }
 func targetHost(target string) (string, error) {

@@ -112,6 +112,10 @@ type ProviderGateway interface {
 	ResolveCodes(context.Context, Provider, string, string, []string) (map[string]Item, error)
 }
 
+type ProviderResolver interface {
+	ResolveProvider(context.Context, string) (Provider, Capability, error)
+}
+
 type Page[T any] struct {
 	Items      []T    `json:"items"`
 	Total      int64  `json:"total"`
