@@ -1,0 +1,988 @@
+basePath: /
+definitions:
+  buildinfo.Info:
+    properties:
+      build_time:
+        type: string
+      commit:
+        type: string
+      started_at:
+        type: string
+      uptime:
+        type: string
+      version:
+        type: string
+    type: object
+  health.Dependency:
+    properties:
+      latency:
+        type: string
+      status:
+        type: string
+    type: object
+  health.Status:
+    properties:
+      dependencies:
+        additionalProperties:
+          $ref: '#/definitions/health.Dependency'
+        type: object
+      status:
+        type: string
+    type: object
+  httptransport.CapabilityRequest:
+    properties:
+      dictionary_code:
+        type: string
+      filter_keys:
+        items:
+          type: string
+        type: array
+      max_page_size:
+        type: integer
+      max_tree_depth:
+        type: integer
+      max_tree_nodes:
+        type: integer
+      sort_keys:
+        items:
+          type: string
+        type: array
+      supports_cursor:
+        type: boolean
+      supports_search:
+        type: boolean
+      supports_tree:
+        type: boolean
+    required:
+    - dictionary_code
+    type: object
+  httptransport.CreateDictionaryRequest:
+    properties:
+      code:
+        type: string
+      description:
+        type: string
+      metadata_json:
+        type: object
+      name:
+        type: string
+      tenant_id:
+        type: string
+    required:
+    - code
+    - name
+    type: object
+  httptransport.DeleteItemRequest:
+    properties:
+      id:
+        type: string
+      version:
+        type: integer
+    required:
+    - id
+    - version
+    type: object
+  httptransport.DictionaryPageView:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/httptransport.DictionaryView'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+    type: object
+  httptransport.DictionaryView:
+    properties:
+      code:
+        type: string
+      created_at:
+        type: string
+      created_by:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      kind:
+        type: string
+      metadata_json:
+        type: object
+      name:
+        type: string
+      provider_id:
+        type: string
+      published_version:
+        type: integer
+      status:
+        type: string
+      tenant_id:
+        type: string
+      updated_at:
+        type: string
+      updated_by:
+        type: string
+      version:
+        type: integer
+    type: object
+  httptransport.GetDictionaryRequest:
+    properties:
+      code:
+        type: string
+      tenant_id:
+        type: string
+    required:
+    - code
+    type: object
+  httptransport.ItemListView:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/httptransport.ItemView'
+        type: array
+    type: object
+  httptransport.ItemView:
+    properties:
+      code:
+        type: string
+      created_at:
+        type: string
+      created_by:
+        type: string
+      dictionary_code:
+        type: string
+      disabled:
+        type: boolean
+      id:
+        type: string
+      leaf:
+        type: boolean
+      metadata_json:
+        type: object
+      name:
+        type: string
+      parent_code:
+        type: string
+      parent_id:
+        type: string
+      sort_order:
+        type: integer
+      status:
+        type: string
+      updated_at:
+        type: string
+      updated_by:
+        type: string
+      version:
+        type: integer
+    type: object
+  httptransport.ListDictionariesRequest:
+    properties:
+      keyword:
+        type: string
+      page:
+        type: integer
+      page_size:
+        type: integer
+      status:
+        type: string
+      tenant_id:
+        type: string
+    type: object
+  httptransport.ListProvidersRequest:
+    properties:
+      page:
+        type: integer
+      page_size:
+        type: integer
+      status:
+        type: string
+    type: object
+  httptransport.MeResponseBody:
+    properties:
+      subject:
+        type: string
+    type: object
+  httptransport.ProviderLeaseRequest:
+    properties:
+      lease_seconds:
+        type: integer
+      lease_token:
+        type: string
+      provider_id:
+        type: string
+    required:
+    - lease_token
+    - provider_id
+    type: object
+  httptransport.ProviderLeaseView:
+    properties:
+      lease_expires_at:
+        type: string
+    type: object
+  httptransport.ProviderPageView:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/httptransport.ProviderView'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+    type: object
+  httptransport.ProviderRegistrationView:
+    properties:
+      lease_token:
+        type: string
+      provider:
+        $ref: '#/definitions/httptransport.ProviderView'
+    type: object
+  httptransport.ProviderView:
+    properties:
+      cache_ttl_seconds:
+        type: integer
+      capabilities_json:
+        items:
+          type: object
+        type: array
+      created_at:
+        type: string
+      created_by:
+        type: string
+      id:
+        type: string
+      lease_expires_at:
+        type: string
+      service_name:
+        type: string
+      status:
+        type: string
+      target:
+        type: string
+      timeout_milliseconds:
+        type: integer
+      updated_at:
+        type: string
+      updated_by:
+        type: string
+      version:
+        type: integer
+    type: object
+  httptransport.PublishDictionaryRequest:
+    properties:
+      comment:
+        type: string
+      dictionary_id:
+        type: string
+      dictionary_version:
+        type: integer
+    required:
+    - dictionary_id
+    - dictionary_version
+    type: object
+  httptransport.PublishView:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/httptransport.ItemView'
+        type: array
+      release_version:
+        type: integer
+    type: object
+  httptransport.QueryDictionaryRequest:
+    properties:
+      cursor:
+        type: string
+      descending:
+        type: boolean
+      dictionary_code:
+        type: string
+      filters:
+        additionalProperties:
+          type: string
+        type: object
+      keyword:
+        type: string
+      limit:
+        type: integer
+      page:
+        type: integer
+      page_size:
+        type: integer
+      sort:
+        type: string
+      tenant_id:
+        type: string
+    required:
+    - dictionary_code
+    type: object
+  httptransport.QueryPageView:
+    properties:
+      has_more:
+        type: boolean
+      items:
+        items:
+          $ref: '#/definitions/httptransport.ItemView'
+        type: array
+      next_cursor:
+        type: string
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+    type: object
+  httptransport.RegisterProviderRequest:
+    properties:
+      cache_ttl_seconds:
+        type: integer
+      capabilities:
+        items:
+          $ref: '#/definitions/httptransport.CapabilityRequest'
+        type: array
+      lease_seconds:
+        type: integer
+      service_name:
+        type: string
+      target:
+        type: string
+      timeout_milliseconds:
+        type: integer
+    required:
+    - capabilities
+    - service_name
+    - target
+    type: object
+  httptransport.ResolveCodesRequest:
+    properties:
+      codes:
+        items:
+          type: string
+        type: array
+      dictionary_code:
+        type: string
+      tenant_id:
+        type: string
+    required:
+    - codes
+    - dictionary_code
+    type: object
+  httptransport.ResolvedCodeView:
+    properties:
+      code:
+        type: string
+      found:
+        type: boolean
+      item:
+        $ref: '#/definitions/httptransport.ItemView'
+    type: object
+  httptransport.Response:
+    properties:
+      body: {}
+      code:
+        type: integer
+      message:
+        type: string
+      request_id:
+        type: string
+    type: object
+  httptransport.TreeDictionaryRequest:
+    properties:
+      dictionary_code:
+        type: string
+      keyword:
+        type: string
+      max_depth:
+        type: integer
+      max_nodes:
+        type: integer
+      mode:
+        type: string
+      parent_id:
+        type: string
+      tenant_id:
+        type: string
+    required:
+    - dictionary_code
+    - mode
+    type: object
+  httptransport.TreeResultView:
+    properties:
+      roots:
+        items:
+          $ref: '#/definitions/httptransport.TreeView'
+        type: array
+      truncated:
+        type: boolean
+    type: object
+  httptransport.TreeView:
+    properties:
+      children:
+        items:
+          $ref: '#/definitions/httptransport.TreeView'
+        type: array
+      item:
+        $ref: '#/definitions/httptransport.ItemView'
+    type: object
+  httptransport.UpdateDictionaryRequest:
+    properties:
+      description:
+        type: string
+      id:
+        type: string
+      metadata_json:
+        type: object
+      name:
+        type: string
+      status:
+        type: string
+      version:
+        type: integer
+    required:
+    - id
+    - name
+    - status
+    - version
+    type: object
+  httptransport.UpsertItemsRequest:
+    properties:
+      dictionary_id:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/httptransport.ItemView'
+        type: array
+    required:
+    - dictionary_id
+    - items
+    type: object
+info:
+  contact: {}
+  description: 'Static dictionary release management and the unified gateway for dynamic
+    business dictionaries. Error codes: 0 success; 10000-19999 common/input; 20000-29999
+    authentication/authorization; 30000-39999 business/concurrency; 50000-59999 infrastructure/provider
+    failures.'
+  title: Platform Dictionary Service API
+  version: "1.0"
+paths:
+  /api/v1/dictionaries/create:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Dictionary draft
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.CreateDictionaryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.DictionaryView'
+              type: object
+        "400":
+          description: 'Code 10001: invalid request'
+          schema:
+            $ref: '#/definitions/httptransport.Response'
+        "409":
+          description: 'Code 30009: duplicate dictionary'
+          schema:
+            $ref: '#/definitions/httptransport.Response'
+      security:
+      - Bearer: []
+      summary: Create a static dictionary draft
+      tags:
+      - dictionaries
+  /api/v1/dictionaries/get:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Tenant and dictionary code
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.GetDictionaryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.DictionaryView'
+              type: object
+        "404":
+          description: 'Code 10004: dictionary not found'
+          schema:
+            $ref: '#/definitions/httptransport.Response'
+      security:
+      - Bearer: []
+      summary: Get a static or dynamic dictionary definition
+      tags:
+      - dictionaries
+  /api/v1/dictionaries/items/delete:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Item and expected version
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.DeleteItemRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httptransport.Response'
+        "409":
+          description: 'Code 30009: stale item version'
+          schema:
+            $ref: '#/definitions/httptransport.Response'
+      security:
+      - Bearer: []
+      summary: Delete a dictionary draft item using optimistic locking
+      tags:
+      - dictionary-items
+  /api/v1/dictionaries/items/upsert:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Draft items and expected versions
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.UpsertItemsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.ItemListView'
+              type: object
+        "409":
+          description: 'Code 30009: stale item version'
+          schema:
+            $ref: '#/definitions/httptransport.Response'
+      security:
+      - Bearer: []
+      summary: Upsert dictionary draft items
+      tags:
+      - dictionary-items
+  /api/v1/dictionaries/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Search and pagination
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.ListDictionariesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.DictionaryPageView'
+              type: object
+      security:
+      - Bearer: []
+      summary: List dictionary definitions
+      tags:
+      - dictionaries
+  /api/v1/dictionaries/providers/heartbeat:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Provider lease token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.ProviderLeaseRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.ProviderLeaseView'
+              type: object
+      security:
+      - PSK: []
+      summary: Renew a dynamic provider lease
+      tags:
+      - dictionary-providers
+  /api/v1/dictionaries/providers/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Provider status and pagination
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.ListProvidersRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.ProviderPageView'
+              type: object
+      security:
+      - Bearer: []
+      summary: List registered dynamic providers
+      tags:
+      - dictionary-providers
+  /api/v1/dictionaries/providers/register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Provider target and capabilities
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.RegisterProviderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.ProviderRegistrationView'
+              type: object
+      security:
+      - PSK: []
+      summary: Register or replace a dynamic dictionary provider lease
+      tags:
+      - dictionary-providers
+  /api/v1/dictionaries/providers/unregister:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Provider lease token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.ProviderLeaseRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httptransport.Response'
+      security:
+      - PSK: []
+      summary: Mark a dynamic provider inactive
+      tags:
+      - dictionary-providers
+  /api/v1/dictionaries/publish:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Dictionary expected version
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.PublishDictionaryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.PublishView'
+              type: object
+        "409":
+          description: 'Code 30009: stale version or concurrent publication'
+          schema:
+            $ref: '#/definitions/httptransport.Response'
+      security:
+      - Bearer: []
+      summary: Publish an immutable dictionary release
+      tags:
+      - dictionaries
+  /api/v1/dictionaries/query:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Allow-listed search, filter, sort and pagination
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.QueryDictionaryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.QueryPageView'
+              type: object
+        "503":
+          description: 'Code 50003: provider unavailable'
+          schema:
+            $ref: '#/definitions/httptransport.Response'
+      security:
+      - Bearer: []
+      summary: Query a static release or registered dynamic dictionary
+      tags:
+      - dictionary-query
+  /api/v1/dictionaries/resolve:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Codes to resolve
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.ResolveCodesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  items:
+                    $ref: '#/definitions/httptransport.ResolvedCodeView'
+                  type: array
+              type: object
+      security:
+      - Bearer: []
+      summary: Resolve dictionary codes in one request
+      tags:
+      - dictionary-query
+  /api/v1/dictionaries/tree:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Tree mode and bounds
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.TreeDictionaryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.TreeResultView'
+              type: object
+      security:
+      - Bearer: []
+      summary: Read a bounded dictionary tree
+      tags:
+      - dictionary-query
+  /api/v1/dictionaries/update:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Dictionary and expected version
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.UpdateDictionaryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.DictionaryView'
+              type: object
+        "409":
+          description: 'Code 30009: stale version'
+          schema:
+            $ref: '#/definitions/httptransport.Response'
+      security:
+      - Bearer: []
+      summary: Update a dictionary using optimistic locking
+      tags:
+      - dictionaries
+  /api/v1/me:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.MeResponseBody'
+              type: object
+        "401":
+          description: 'Code 20001: unauthorized'
+          schema:
+            $ref: '#/definitions/httptransport.Response'
+      security:
+      - Bearer: []
+      summary: Return the authenticated subject
+      tags:
+      - authentication
+  /api/v1/version:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/buildinfo.Info'
+              type: object
+      summary: Return build and runtime version information
+      tags:
+      - operations
+  /live:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/health.Status'
+              type: object
+      summary: Check process liveness
+      tags:
+      - operations
+  /ready:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/health.Status'
+              type: object
+        "503":
+          description: 'Code 50003: dependency unavailable'
+          schema:
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/health.Status'
+              type: object
+      summary: Check database and Redis readiness
+      tags:
+      - operations
+schemes:
+- http
+- https
+securityDefinitions:
+  Bearer:
+    description: Enter "Bearer {JWT}".
+    in: header
+    name: Authorization
+    type: apiKey
+  PSK:
+    description: Enter "PSK {shared-key}" for routes configured with PSK authentication.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

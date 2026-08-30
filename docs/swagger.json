@@ -1,0 +1,1616 @@
+{
+    "schemes": [
+        "http",
+        "https"
+    ],
+    "swagger": "2.0",
+    "info": {
+        "description": "Static dictionary release management and the unified gateway for dynamic business dictionaries. Error codes: 0 success; 10000-19999 common/input; 20000-29999 authentication/authorization; 30000-39999 business/concurrency; 50000-59999 infrastructure/provider failures.",
+        "title": "Platform Dictionary Service API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "basePath": "/",
+    "paths": {
+        "/api/v1/dictionaries/create": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dictionaries"
+                ],
+                "summary": "Create a static dictionary draft",
+                "parameters": [
+                    {
+                        "description": "Dictionary draft",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.CreateDictionaryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.DictionaryView"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Code 10001: invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.Response"
+                        }
+                    },
+                    "409": {
+                        "description": "Code 30009: duplicate dictionary",
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/dictionaries/get": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dictionaries"
+                ],
+                "summary": "Get a static or dynamic dictionary definition",
+                "parameters": [
+                    {
+                        "description": "Tenant and dictionary code",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.GetDictionaryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.DictionaryView"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "404": {
+                        "description": "Code 10004: dictionary not found",
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/dictionaries/items/delete": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dictionary-items"
+                ],
+                "summary": "Delete a dictionary draft item using optimistic locking",
+                "parameters": [
+                    {
+                        "description": "Item and expected version",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.DeleteItemRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.Response"
+                        }
+                    },
+                    "409": {
+                        "description": "Code 30009: stale item version",
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/dictionaries/items/upsert": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dictionary-items"
+                ],
+                "summary": "Upsert dictionary draft items",
+                "parameters": [
+                    {
+                        "description": "Draft items and expected versions",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.UpsertItemsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.ItemListView"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "409": {
+                        "description": "Code 30009: stale item version",
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/dictionaries/list": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dictionaries"
+                ],
+                "summary": "List dictionary definitions",
+                "parameters": [
+                    {
+                        "description": "Search and pagination",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.ListDictionariesRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.DictionaryPageView"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/dictionaries/providers/heartbeat": {
+            "post": {
+                "security": [
+                    {
+                        "PSK": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dictionary-providers"
+                ],
+                "summary": "Renew a dynamic provider lease",
+                "parameters": [
+                    {
+                        "description": "Provider lease token",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.ProviderLeaseRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.ProviderLeaseView"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/dictionaries/providers/list": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dictionary-providers"
+                ],
+                "summary": "List registered dynamic providers",
+                "parameters": [
+                    {
+                        "description": "Provider status and pagination",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.ListProvidersRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.ProviderPageView"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/dictionaries/providers/register": {
+            "post": {
+                "security": [
+                    {
+                        "PSK": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dictionary-providers"
+                ],
+                "summary": "Register or replace a dynamic dictionary provider lease",
+                "parameters": [
+                    {
+                        "description": "Provider target and capabilities",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.RegisterProviderRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.ProviderRegistrationView"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/dictionaries/providers/unregister": {
+            "post": {
+                "security": [
+                    {
+                        "PSK": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dictionary-providers"
+                ],
+                "summary": "Mark a dynamic provider inactive",
+                "parameters": [
+                    {
+                        "description": "Provider lease token",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.ProviderLeaseRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/dictionaries/publish": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dictionaries"
+                ],
+                "summary": "Publish an immutable dictionary release",
+                "parameters": [
+                    {
+                        "description": "Dictionary expected version",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.PublishDictionaryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.PublishView"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "409": {
+                        "description": "Code 30009: stale version or concurrent publication",
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/dictionaries/query": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dictionary-query"
+                ],
+                "summary": "Query a static release or registered dynamic dictionary",
+                "parameters": [
+                    {
+                        "description": "Allow-listed search, filter, sort and pagination",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.QueryDictionaryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.QueryPageView"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "503": {
+                        "description": "Code 50003: provider unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/dictionaries/resolve": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dictionary-query"
+                ],
+                "summary": "Resolve dictionary codes in one request",
+                "parameters": [
+                    {
+                        "description": "Codes to resolve",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.ResolveCodesRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/httptransport.ResolvedCodeView"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/dictionaries/tree": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dictionary-query"
+                ],
+                "summary": "Read a bounded dictionary tree",
+                "parameters": [
+                    {
+                        "description": "Tree mode and bounds",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.TreeDictionaryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.TreeResultView"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/dictionaries/update": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dictionaries"
+                ],
+                "summary": "Update a dictionary using optimistic locking",
+                "parameters": [
+                    {
+                        "description": "Dictionary and expected version",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.UpdateDictionaryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.DictionaryView"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "409": {
+                        "description": "Code 30009: stale version",
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authentication"
+                ],
+                "summary": "Return the authenticated subject",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.MeResponseBody"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Code 20001: unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/version": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "operations"
+                ],
+                "summary": "Return build and runtime version information",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/buildinfo.Info"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/live": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "operations"
+                ],
+                "summary": "Check process liveness",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/health.Status"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/ready": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "operations"
+                ],
+                "summary": "Check database and Redis readiness",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/health.Status"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "503": {
+                        "description": "Code 50003: dependency unavailable",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/health.Status"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "buildinfo.Info": {
+            "type": "object",
+            "properties": {
+                "build_time": {
+                    "type": "string"
+                },
+                "commit": {
+                    "type": "string"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "uptime": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "health.Dependency": {
+            "type": "object",
+            "properties": {
+                "latency": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "health.Status": {
+            "type": "object",
+            "properties": {
+                "dependencies": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/health.Dependency"
+                    }
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "httptransport.CapabilityRequest": {
+            "type": "object",
+            "required": [
+                "dictionary_code"
+            ],
+            "properties": {
+                "dictionary_code": {
+                    "type": "string"
+                },
+                "filter_keys": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "max_page_size": {
+                    "type": "integer"
+                },
+                "max_tree_depth": {
+                    "type": "integer"
+                },
+                "max_tree_nodes": {
+                    "type": "integer"
+                },
+                "sort_keys": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "supports_cursor": {
+                    "type": "boolean"
+                },
+                "supports_search": {
+                    "type": "boolean"
+                },
+                "supports_tree": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "httptransport.CreateDictionaryRequest": {
+            "type": "object",
+            "required": [
+                "code",
+                "name"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "metadata_json": {
+                    "type": "object"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "tenant_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "httptransport.DeleteItemRequest": {
+            "type": "object",
+            "required": [
+                "id",
+                "version"
+            ],
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "httptransport.DictionaryPageView": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httptransport.DictionaryView"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "httptransport.DictionaryView": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "metadata_json": {
+                    "type": "object"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "provider_id": {
+                    "type": "string"
+                },
+                "published_version": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "tenant_id": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "httptransport.GetDictionaryRequest": {
+            "type": "object",
+            "required": [
+                "code"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "tenant_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "httptransport.ItemListView": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httptransport.ItemView"
+                    }
+                }
+            }
+        },
+        "httptransport.ItemView": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "string"
+                },
+                "dictionary_code": {
+                    "type": "string"
+                },
+                "disabled": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "leaf": {
+                    "type": "boolean"
+                },
+                "metadata_json": {
+                    "type": "object"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "parent_code": {
+                    "type": "string"
+                },
+                "parent_id": {
+                    "type": "string"
+                },
+                "sort_order": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "httptransport.ListDictionariesRequest": {
+            "type": "object",
+            "properties": {
+                "keyword": {
+                    "type": "string"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "tenant_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "httptransport.ListProvidersRequest": {
+            "type": "object",
+            "properties": {
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "httptransport.MeResponseBody": {
+            "type": "object",
+            "properties": {
+                "subject": {
+                    "type": "string"
+                }
+            }
+        },
+        "httptransport.ProviderLeaseRequest": {
+            "type": "object",
+            "required": [
+                "lease_token",
+                "provider_id"
+            ],
+            "properties": {
+                "lease_seconds": {
+                    "type": "integer"
+                },
+                "lease_token": {
+                    "type": "string"
+                },
+                "provider_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "httptransport.ProviderLeaseView": {
+            "type": "object",
+            "properties": {
+                "lease_expires_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "httptransport.ProviderPageView": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httptransport.ProviderView"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "httptransport.ProviderRegistrationView": {
+            "type": "object",
+            "properties": {
+                "lease_token": {
+                    "type": "string"
+                },
+                "provider": {
+                    "$ref": "#/definitions/httptransport.ProviderView"
+                }
+            }
+        },
+        "httptransport.ProviderView": {
+            "type": "object",
+            "properties": {
+                "cache_ttl_seconds": {
+                    "type": "integer"
+                },
+                "capabilities_json": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    }
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "lease_expires_at": {
+                    "type": "string"
+                },
+                "service_name": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "target": {
+                    "type": "string"
+                },
+                "timeout_milliseconds": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "httptransport.PublishDictionaryRequest": {
+            "type": "object",
+            "required": [
+                "dictionary_id",
+                "dictionary_version"
+            ],
+            "properties": {
+                "comment": {
+                    "type": "string"
+                },
+                "dictionary_id": {
+                    "type": "string"
+                },
+                "dictionary_version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "httptransport.PublishView": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httptransport.ItemView"
+                    }
+                },
+                "release_version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "httptransport.QueryDictionaryRequest": {
+            "type": "object",
+            "required": [
+                "dictionary_code"
+            ],
+            "properties": {
+                "cursor": {
+                    "type": "string"
+                },
+                "descending": {
+                    "type": "boolean"
+                },
+                "dictionary_code": {
+                    "type": "string"
+                },
+                "filters": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "keyword": {
+                    "type": "string"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "sort": {
+                    "type": "string"
+                },
+                "tenant_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "httptransport.QueryPageView": {
+            "type": "object",
+            "properties": {
+                "has_more": {
+                    "type": "boolean"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httptransport.ItemView"
+                    }
+                },
+                "next_cursor": {
+                    "type": "string"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "httptransport.RegisterProviderRequest": {
+            "type": "object",
+            "required": [
+                "capabilities",
+                "service_name",
+                "target"
+            ],
+            "properties": {
+                "cache_ttl_seconds": {
+                    "type": "integer"
+                },
+                "capabilities": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httptransport.CapabilityRequest"
+                    }
+                },
+                "lease_seconds": {
+                    "type": "integer"
+                },
+                "service_name": {
+                    "type": "string"
+                },
+                "target": {
+                    "type": "string"
+                },
+                "timeout_milliseconds": {
+                    "type": "integer"
+                }
+            }
+        },
+        "httptransport.ResolveCodesRequest": {
+            "type": "object",
+            "required": [
+                "codes",
+                "dictionary_code"
+            ],
+            "properties": {
+                "codes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "dictionary_code": {
+                    "type": "string"
+                },
+                "tenant_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "httptransport.ResolvedCodeView": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "found": {
+                    "type": "boolean"
+                },
+                "item": {
+                    "$ref": "#/definitions/httptransport.ItemView"
+                }
+            }
+        },
+        "httptransport.Response": {
+            "type": "object",
+            "properties": {
+                "body": {},
+                "code": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "request_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "httptransport.TreeDictionaryRequest": {
+            "type": "object",
+            "required": [
+                "dictionary_code",
+                "mode"
+            ],
+            "properties": {
+                "dictionary_code": {
+                    "type": "string"
+                },
+                "keyword": {
+                    "type": "string"
+                },
+                "max_depth": {
+                    "type": "integer"
+                },
+                "max_nodes": {
+                    "type": "integer"
+                },
+                "mode": {
+                    "type": "string"
+                },
+                "parent_id": {
+                    "type": "string"
+                },
+                "tenant_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "httptransport.TreeResultView": {
+            "type": "object",
+            "properties": {
+                "roots": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httptransport.TreeView"
+                    }
+                },
+                "truncated": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "httptransport.TreeView": {
+            "type": "object",
+            "properties": {
+                "children": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httptransport.TreeView"
+                    }
+                },
+                "item": {
+                    "$ref": "#/definitions/httptransport.ItemView"
+                }
+            }
+        },
+        "httptransport.UpdateDictionaryRequest": {
+            "type": "object",
+            "required": [
+                "id",
+                "name",
+                "status",
+                "version"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "metadata_json": {
+                    "type": "object"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "httptransport.UpsertItemsRequest": {
+            "type": "object",
+            "required": [
+                "dictionary_id",
+                "items"
+            ],
+            "properties": {
+                "dictionary_id": {
+                    "type": "string"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httptransport.ItemView"
+                    }
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "Bearer": {
+            "description": "Enter \"Bearer {JWT}\".",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        },
+        "PSK": {
+            "description": "Enter \"PSK {shared-key}\" for routes configured with PSK authentication.",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}

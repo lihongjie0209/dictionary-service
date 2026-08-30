@@ -1,0 +1,59 @@
+# Production deliberately fails fast until secrets, endpoints, and TLS files
+# are injected through APP_* variables or the platform secret manager.
+app:
+  env: production
+http:
+  address: 0.0.0.0:8080
+log:
+  level: info
+  format: json
+swagger:
+  enabled: true
+  require_auth: true
+grpc:
+  address: 0.0.0.0:9090
+  reflection_enabled: false
+  tls:
+    enabled: true
+    cert_file: /etc/platform/tls/tls.crt
+    key_file: /etc/platform/tls/tls.key
+    client_ca_file: /etc/platform/tls/ca.crt
+database:
+  enabled: true
+  name: platform
+  schema: dictionary
+  dsn: ""
+redis:
+  enabled: true
+migration:
+  auto_up: true
+  create_schema: false
+  database_url: ""
+rate_limit:
+  enabled: true
+idempotency:
+  enabled: true
+observability:
+  metrics_enabled: true
+  tracing_enabled: false
+auth:
+  jwks_url: http://identity-service.platform.svc.cluster.local:8080/.well-known/jwks.json
+  issuer: identity-service
+  audience: dictionary-service
+  psk:
+    enabled: true
+    key: ""
+    grpc_methods: [/platform.dictionary.v1.DictionaryService/RegisterProvider, /platform.dictionary.v1.DictionaryService/HeartbeatProvider, /platform.dictionary.v1.DictionaryService/UnregisterProvider]
+event_bus:
+  enabled: true
+  urls: [nats://nats.platform.svc.cluster.local:4222]
+provider_client:
+  enabled: true
+  psk: ""
+  allow_insecure: false
+  tls:
+    enabled: true
+    server_name: ""
+    ca_file: /etc/platform/tls/ca.crt
+    cert_file: /etc/platform/tls/tls.crt
+    key_file: /etc/platform/tls/tls.key

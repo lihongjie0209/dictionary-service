@@ -1,0 +1,26 @@
+app:
+  env: compose
+log:
+  level: debug
+  file: /app/logs/app.log
+swagger:
+  enabled: true
+database:
+  name: platform
+  schema: dictionary
+grpc:
+  reflection_enabled: true
+cron:
+  enabled: true
+event_bus:
+  enabled: true
+  urls: [nats://nats:4222]
+auth:
+  psk:
+    enabled: true
+    key: dictionary-provider-dev-psk-0000000000000000
+    grpc_methods: [/platform.dictionary.v1.DictionaryService/RegisterProvider, /platform.dictionary.v1.DictionaryService/HeartbeatProvider, /platform.dictionary.v1.DictionaryService/UnregisterProvider]
+provider_client:
+  enabled: true
+  psk: dictionary-provider-dev-psk-0000000000000000
+  allow_insecure: true
