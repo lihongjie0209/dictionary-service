@@ -94,7 +94,7 @@ func TestHTTPAndGRPCEndToEnd(t *testing.T) {
 		Cron:           config.Cron{Enabled: false, Timezone: "UTC"},
 		User:           config.User{CacheTTL: time.Minute, LockTTL: 10 * time.Second, LockRetryDelay: 20 * time.Millisecond},
 		Idempotency:    config.Idempotency{Enabled: true, ProcessingTTL: 30 * time.Second, ResultTTL: time.Hour, FailureTTL: time.Minute},
-		EventBus:       config.EventBus{Enabled: true, URLs: []string{natsURL}, StreamName: "PLATFORM_EVENTS", Subjects: []string{"platform.>"}, Storage: "memory", MaxAge: time.Hour, DuplicateWindow: time.Minute, ConnectTimeout: 5 * time.Second, ReconnectWait: time.Second, PublishTimeout: 5 * time.Second, ConsumerAckWait: 30 * time.Second, ConsumerMaxDeliver: 3, DispatchInterval: 20 * time.Millisecond, DispatchBatchSize: 20, DispatchLease: 30 * time.Second, DispatchRetryDelay: 100 * time.Millisecond},
+		EventBus:       config.EventBus{Enabled: true, URLs: []string{natsURL}, StreamName: "PLATFORM_EVENTS", Subjects: []string{"platform.>"}, Storage: "memory", MaxAge: time.Hour, DuplicateWindow: time.Minute, ConnectTimeout: 5 * time.Second, ReconnectWait: time.Second, PublishTimeout: 5 * time.Second, ConsumerAckWait: 30 * time.Second, ConsumerMaxDeliver: 3, DispatchInterval: 20 * time.Millisecond, DispatchBatchSize: 20, DispatchLease: 30 * time.Second, DispatchRetryDelay: 100 * time.Millisecond, PublishedRetention: time.Hour, CleanupInterval: time.Hour, CleanupBatchSize: 20},
 	}
 	application := app.New(cfg)
 	if err := application.Start(ctx); err != nil {
