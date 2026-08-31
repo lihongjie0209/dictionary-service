@@ -177,6 +177,56 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/dictionaries/items/list": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dictionary-items"
+                ],
+                "summary": "List editable dictionary draft items",
+                "parameters": [
+                    {
+                        "description": "Dictionary ID",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.ListDraftItemsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.ItemListView"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/dictionaries/items/upsert": {
             "post": {
                 "security": [
@@ -1186,6 +1236,17 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "tenant_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "httptransport.ListDraftItemsRequest": {
+            "type": "object",
+            "required": [
+                "dictionary_id"
+            ],
+            "properties": {
+                "dictionary_id": {
                     "type": "string"
                 }
             }

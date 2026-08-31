@@ -1,9 +1,24 @@
 package dictionary
 
 import (
+	"context"
 	"errors"
 	"testing"
 )
+
+type draftItemsRepository struct {
+	Repository
+	dictionary Dictionary
+	items      []Item
+}
+
+func (r draftItemsRepository) GetDictionaryByID(context.Context, string) (Dictionary, error) {
+	return r.dictionary, nil
+}
+
+func (r draftItemsRepository) ListDraftItems(context.Context, string) ([]Item, error) {
+	return r.items, nil
+}
 
 func TestValidateDictionary(t *testing.T) {
 	t.Parallel()
@@ -25,6 +40,27 @@ func TestValidateDictionary(t *testing.T) {
 				t.Fatalf("validateDictionary() error = %v, wantErr %v", err, test.wantErr)
 			}
 		})
+	}
+}
+
+func TestListDraftItemsReturnsEditableStaticItems(t *testing.T) {
+	t.Parallel()
+	repository := draftItemsRepository{
+		dictionary: Dictionary{ID: "dictionary-1", Kind: KindStatic},
+		items:      []Item{{ID: "item-1", DictionaryID: "dictionary-1", Code: "active"}},
+	}
+	service := NewService(repository, nil, nil, nil)
+	items, err := service.ListDraftItems(t.Context(), " dictionary-1 ")
+	if err != nil || len(items) != 1 || items[0].ID != "item-1" {
+		t.Fatalf("ListDraftItems() = (%+v, %v)", items, err)
+	}
+}
+
+func TestListDraftItemsRejectsDynamicDictionary(t *testing.T) {
+	t.Parallel()
+	service := NewService(draftItemsRepository{dictionary: Dictionary{ID: "dictionary-1", Kind: KindDynamic}}, nil, nil, nil)
+	if _, err := service.ListDraftItems(t.Context(), "dictionary-1"); err == nil {
+		t.Fatal("ListDraftItems() accepted a dynamic dictionary")
 	}
 }
 

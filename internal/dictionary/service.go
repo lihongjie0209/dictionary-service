@@ -167,6 +167,18 @@ func (s *Service) UpsertItems(ctx context.Context, dictionaryID string, items []
 	return items, translate(err)
 }
 
+func (s *Service) ListDraftItems(ctx context.Context, dictionaryID string) ([]Item, error) {
+	dictionary, err := s.repository.GetDictionaryByID(ctx, strings.TrimSpace(dictionaryID))
+	if err != nil {
+		return nil, translate(err)
+	}
+	if dictionary.Kind != KindStatic {
+		return nil, apperror.Conflict("dynamic dictionaries do not have draft items", nil)
+	}
+	items, err := s.repository.ListDraftItems(ctx, dictionary.ID)
+	return items, translate(err)
+}
+
 func (s *Service) DeleteItem(ctx context.Context, id string, expected int64) error {
 	actor, err := actor(ctx)
 	if err != nil {

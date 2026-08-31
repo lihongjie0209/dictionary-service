@@ -192,6 +192,13 @@ definitions:
       tenant_id:
         type: string
     type: object
+  httptransport.ListDraftItemsRequest:
+    properties:
+      dictionary_id:
+        type: string
+    required:
+    - dictionary_id
+    type: object
   httptransport.ListProvidersRequest:
     properties:
       page:
@@ -565,6 +572,34 @@ paths:
       security:
       - Bearer: []
       summary: Delete a dictionary draft item using optimistic locking
+      tags:
+      - dictionary-items
+  /api/v1/dictionaries/items/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Dictionary ID
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.ListDraftItemsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.ItemListView'
+              type: object
+      security:
+      - Bearer: []
+      summary: List editable dictionary draft items
       tags:
       - dictionary-items
   /api/v1/dictionaries/items/upsert:

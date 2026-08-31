@@ -75,6 +75,9 @@ type UpsertItemsRequest struct {
 	DictionaryID string     `json:"dictionary_id" binding:"required"`
 	Items        []ItemView `json:"items" binding:"required"`
 }
+type ListDraftItemsRequest struct {
+	DictionaryID string `json:"dictionary_id" binding:"required"`
+}
 type DeleteItemRequest struct {
 	ID      string `json:"id" binding:"required"`
 	Version int64  `json:"version" binding:"required"`
@@ -303,6 +306,24 @@ func (h *Handler) UpsertItems(c *gin.Context) {
 	}
 	values, err := h.dictionaries.UpsertItems(c.Request.Context(), request.DictionaryID, items)
 	respond(c, h.logger, itemViews(values), err)
+}
+
+// ListDraftItems godoc
+// @Summary List editable dictionary draft items
+// @Tags dictionary-items
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Param request body ListDraftItemsRequest true "Dictionary ID"
+// @Success 200 {object} Response{body=ItemListView}
+// @Router /api/v1/dictionaries/items/list [post]
+func (h *Handler) ListDraftItems(c *gin.Context) {
+	var request ListDraftItemsRequest
+	if !bind(c, h.logger, &request) {
+		return
+	}
+	values, err := h.dictionaries.ListDraftItems(c.Request.Context(), request.DictionaryID)
+	respond(c, h.logger, gin.H{"items": itemViews(values)}, err)
 }
 
 // DeleteItem godoc
