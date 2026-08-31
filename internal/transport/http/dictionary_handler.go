@@ -1,6 +1,7 @@
 package httptransport
 
 import (
+	"encoding/json"
 	"log/slog"
 	"time"
 
@@ -10,54 +11,54 @@ import (
 )
 
 type DictionaryView struct {
-	ID               string    `json:"id"`
-	TenantID         string    `json:"tenant_id"`
-	Code             string    `json:"code"`
-	Name             string    `json:"name"`
-	Description      string    `json:"description"`
-	Kind             string    `json:"kind"`
-	Status           string    `json:"status"`
-	ProviderID       string    `json:"provider_id"`
-	MetadataJSON     string    `json:"metadata_json" swaggertype:"object"`
-	PublishedVersion int64     `json:"published_version"`
-	Version          int64     `json:"version"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
-	CreatedBy        string    `json:"created_by"`
-	UpdatedBy        string    `json:"updated_by"`
+	ID               string          `json:"id"`
+	TenantID         string          `json:"tenant_id"`
+	Code             string          `json:"code"`
+	Name             string          `json:"name"`
+	Description      string          `json:"description"`
+	Kind             string          `json:"kind"`
+	Status           string          `json:"status"`
+	ProviderID       string          `json:"provider_id"`
+	MetadataJSON     json.RawMessage `json:"metadata_json" swaggertype:"object"`
+	PublishedVersion int64           `json:"published_version"`
+	Version          int64           `json:"version"`
+	CreatedAt        time.Time       `json:"created_at"`
+	UpdatedAt        time.Time       `json:"updated_at"`
+	CreatedBy        string          `json:"created_by"`
+	UpdatedBy        string          `json:"updated_by"`
 }
 type ItemView struct {
-	ID             string    `json:"id"`
-	DictionaryCode string    `json:"dictionary_code"`
-	Code           string    `json:"code"`
-	Name           string    `json:"name"`
-	ParentID       string    `json:"parent_id"`
-	ParentCode     string    `json:"parent_code"`
-	Status         string    `json:"status"`
-	MetadataJSON   string    `json:"metadata_json" swaggertype:"object"`
-	Leaf           bool      `json:"leaf"`
-	Disabled       bool      `json:"disabled"`
-	SortOrder      int32     `json:"sort_order"`
-	Version        int64     `json:"version"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
-	CreatedBy      string    `json:"created_by"`
-	UpdatedBy      string    `json:"updated_by"`
+	ID             string          `json:"id"`
+	DictionaryCode string          `json:"dictionary_code"`
+	Code           string          `json:"code"`
+	Name           string          `json:"name"`
+	ParentID       string          `json:"parent_id"`
+	ParentCode     string          `json:"parent_code"`
+	Status         string          `json:"status"`
+	MetadataJSON   json.RawMessage `json:"metadata_json" swaggertype:"object"`
+	Leaf           bool            `json:"leaf"`
+	Disabled       bool            `json:"disabled"`
+	SortOrder      int32           `json:"sort_order"`
+	Version        int64           `json:"version"`
+	CreatedAt      time.Time       `json:"created_at"`
+	UpdatedAt      time.Time       `json:"updated_at"`
+	CreatedBy      string          `json:"created_by"`
+	UpdatedBy      string          `json:"updated_by"`
 }
 type CreateDictionaryRequest struct {
-	TenantID     string `json:"tenant_id"`
-	Code         string `json:"code" binding:"required"`
-	Name         string `json:"name" binding:"required"`
-	Description  string `json:"description"`
-	MetadataJSON string `json:"metadata_json" swaggertype:"object"`
+	TenantID     string          `json:"tenant_id"`
+	Code         string          `json:"code" binding:"required"`
+	Name         string          `json:"name" binding:"required"`
+	Description  string          `json:"description"`
+	MetadataJSON json.RawMessage `json:"metadata_json" swaggertype:"object"`
 }
 type UpdateDictionaryRequest struct {
-	ID           string `json:"id" binding:"required"`
-	Name         string `json:"name" binding:"required"`
-	Description  string `json:"description"`
-	Status       string `json:"status" binding:"required"`
-	MetadataJSON string `json:"metadata_json" swaggertype:"object"`
-	Version      int64  `json:"version" binding:"required"`
+	ID           string          `json:"id" binding:"required"`
+	Name         string          `json:"name" binding:"required"`
+	Description  string          `json:"description"`
+	Status       string          `json:"status" binding:"required"`
+	MetadataJSON json.RawMessage `json:"metadata_json" swaggertype:"object"`
+	Version      int64           `json:"version" binding:"required"`
 }
 type GetDictionaryRequest struct {
 	TenantID string `json:"tenant_id"`
@@ -139,19 +140,19 @@ type ListProvidersRequest struct {
 	PageSize int    `json:"page_size"`
 }
 type ProviderView struct {
-	ID                  string    `json:"id"`
-	ServiceName         string    `json:"service_name"`
-	Target              string    `json:"target"`
-	Status              string    `json:"status"`
-	CapabilitiesJSON    string    `json:"capabilities_json" swaggertype:"array,object"`
-	CacheTTLSeconds     int32     `json:"cache_ttl_seconds"`
-	TimeoutMilliseconds int32     `json:"timeout_milliseconds"`
-	LeaseExpiresAt      time.Time `json:"lease_expires_at"`
-	Version             int64     `json:"version"`
-	CreatedAt           time.Time `json:"created_at"`
-	UpdatedAt           time.Time `json:"updated_at"`
-	CreatedBy           string    `json:"created_by"`
-	UpdatedBy           string    `json:"updated_by"`
+	ID                  string          `json:"id"`
+	ServiceName         string          `json:"service_name"`
+	Target              string          `json:"target"`
+	Status              string          `json:"status"`
+	CapabilitiesJSON    json.RawMessage `json:"capabilities_json" swaggertype:"array,object"`
+	CacheTTLSeconds     int32           `json:"cache_ttl_seconds"`
+	TimeoutMilliseconds int32           `json:"timeout_milliseconds"`
+	LeaseExpiresAt      time.Time       `json:"lease_expires_at"`
+	Version             int64           `json:"version"`
+	CreatedAt           time.Time       `json:"created_at"`
+	UpdatedAt           time.Time       `json:"updated_at"`
+	CreatedBy           string          `json:"created_by"`
+	UpdatedBy           string          `json:"updated_by"`
 }
 type DictionaryPageView struct {
 	Items    []DictionaryView `json:"items"`
@@ -217,7 +218,7 @@ func (h *Handler) CreateDictionary(c *gin.Context) {
 	if !bind(c, h.logger, &request) {
 		return
 	}
-	value, err := h.dictionaries.Create(c.Request.Context(), dictionary.DictionaryInput{TenantID: request.TenantID, Code: request.Code, Name: request.Name, Description: request.Description, MetadataJSON: request.MetadataJSON})
+	value, err := h.dictionaries.Create(c.Request.Context(), dictionary.DictionaryInput{TenantID: request.TenantID, Code: request.Code, Name: request.Name, Description: request.Description, MetadataJSON: string(rawJSON(request.MetadataJSON, false))})
 	respond(c, h.logger, dictionaryView(value), err)
 }
 
@@ -236,7 +237,7 @@ func (h *Handler) UpdateDictionary(c *gin.Context) {
 	if !bind(c, h.logger, &request) {
 		return
 	}
-	value, err := h.dictionaries.Update(c.Request.Context(), request.ID, dictionary.DictionaryInput{Name: request.Name, Description: request.Description, Status: request.Status, MetadataJSON: request.MetadataJSON}, request.Version)
+	value, err := h.dictionaries.Update(c.Request.Context(), request.ID, dictionary.DictionaryInput{Name: request.Name, Description: request.Description, Status: request.Status, MetadataJSON: string(rawJSON(request.MetadataJSON, false))}, request.Version)
 	respond(c, h.logger, dictionaryView(value), err)
 }
 
@@ -481,10 +482,10 @@ func (h *Handler) ListProviders(c *gin.Context) {
 }
 
 func dictionaryView(value dictionary.Dictionary) DictionaryView {
-	return DictionaryView{ID: value.ID, TenantID: value.TenantID, Code: value.Code, Name: value.Name, Description: value.Description, Kind: value.Kind, Status: value.Status, ProviderID: value.ProviderID, MetadataJSON: value.MetadataJSON, PublishedVersion: value.PublishedVersion, Version: value.Version, CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt, CreatedBy: value.CreatedBy, UpdatedBy: value.UpdatedBy}
+	return DictionaryView{ID: value.ID, TenantID: value.TenantID, Code: value.Code, Name: value.Name, Description: value.Description, Kind: value.Kind, Status: value.Status, ProviderID: value.ProviderID, MetadataJSON: rawJSON(json.RawMessage(value.MetadataJSON), false), PublishedVersion: value.PublishedVersion, Version: value.Version, CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt, CreatedBy: value.CreatedBy, UpdatedBy: value.UpdatedBy}
 }
 func itemView(value dictionary.Item) ItemView {
-	return ItemView{ID: value.ID, DictionaryCode: value.DictionaryCode, Code: value.Code, Name: value.Name, ParentID: value.ParentID, ParentCode: value.ParentCode, Leaf: value.Leaf, SortOrder: value.SortOrder, Disabled: value.Disabled, Status: value.Status, MetadataJSON: value.MetadataJSON, Version: value.Version, CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt, CreatedBy: value.CreatedBy, UpdatedBy: value.UpdatedBy}
+	return ItemView{ID: value.ID, DictionaryCode: value.DictionaryCode, Code: value.Code, Name: value.Name, ParentID: value.ParentID, ParentCode: value.ParentCode, Leaf: value.Leaf, SortOrder: value.SortOrder, Disabled: value.Disabled, Status: value.Status, MetadataJSON: rawJSON(json.RawMessage(value.MetadataJSON), false), Version: value.Version, CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt, CreatedBy: value.CreatedBy, UpdatedBy: value.UpdatedBy}
 }
 func itemViews(values []dictionary.Item) []ItemView {
 	result := make([]ItemView, 0, len(values))
@@ -494,7 +495,7 @@ func itemViews(values []dictionary.Item) []ItemView {
 	return result
 }
 func itemDomain(value ItemView) dictionary.Item {
-	return dictionary.Item{ID: value.ID, Code: value.Code, Name: value.Name, ParentID: value.ParentID, ParentCode: value.ParentCode, Leaf: value.Leaf, SortOrder: value.SortOrder, Disabled: value.Disabled, Status: value.Status, MetadataJSON: value.MetadataJSON, AuditFields: dictionary.AuditFields{Version: value.Version}}
+	return dictionary.Item{ID: value.ID, Code: value.Code, Name: value.Name, ParentID: value.ParentID, ParentCode: value.ParentCode, Leaf: value.Leaf, SortOrder: value.SortOrder, Disabled: value.Disabled, Status: value.Status, MetadataJSON: string(rawJSON(value.MetadataJSON, false)), AuditFields: dictionary.AuditFields{Version: value.Version}}
 }
 func treeViews(values []dictionary.TreeNode) []gin.H {
 	result := make([]gin.H, 0, len(values))
@@ -504,7 +505,17 @@ func treeViews(values []dictionary.TreeNode) []gin.H {
 	return result
 }
 func providerView(value dictionary.Provider) ProviderView {
-	return ProviderView{ID: value.ID, ServiceName: value.ServiceName, Target: value.Target, Status: value.Status, CapabilitiesJSON: value.CapabilitiesJSON, CacheTTLSeconds: value.CacheTTLSeconds, TimeoutMilliseconds: value.TimeoutMilliseconds, LeaseExpiresAt: value.LeaseExpiresAt, Version: value.Version, CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt, CreatedBy: value.CreatedBy, UpdatedBy: value.UpdatedBy}
+	return ProviderView{ID: value.ID, ServiceName: value.ServiceName, Target: value.Target, Status: value.Status, CapabilitiesJSON: rawJSON(json.RawMessage(value.CapabilitiesJSON), true), CacheTTLSeconds: value.CacheTTLSeconds, TimeoutMilliseconds: value.TimeoutMilliseconds, LeaseExpiresAt: value.LeaseExpiresAt, Version: value.Version, CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt, CreatedBy: value.CreatedBy, UpdatedBy: value.UpdatedBy}
+}
+
+func rawJSON(value json.RawMessage, array bool) json.RawMessage {
+	if len(value) > 0 && json.Valid(value) {
+		return value
+	}
+	if array {
+		return json.RawMessage(`[]`)
+	}
+	return json.RawMessage(`{}`)
 }
 func bind(c *gin.Context, logger *slog.Logger, target any) bool {
 	if err := c.ShouldBindJSON(target); err != nil {
