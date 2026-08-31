@@ -2,6 +2,7 @@ package httptransport
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"mime"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 	"github.com/lihongjie0209/dictionary-service/internal/observability"
 	appLimit "github.com/lihongjie0209/dictionary-service/internal/ratelimit"
 	"github.com/lihongjie0209/dictionary-service/internal/requestid"
+	platformauthz "github.com/lihongjie0209/microservice-platform-go/authz"
 	"github.com/lihongjie0209/microservice-platform-go/principal"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -219,9 +221,51 @@ func JWT(service *auth.Service, logger *slog.Logger) gin.HandlerFunc {
 			return
 		}
 		c.Set("subject", identity.ID)
-		c.Request = c.Request.WithContext(principal.WithContext(c.Request.Context(), identity))
+		ctx := principal.WithContext(c.Request.Context(), identity)
+		c.Request = c.Request.WithContext(platformauthz.WithCallerCredential(ctx, header))
 		c.Next()
 	}
+}
+
+func Authorization(enabled bool, authorizer platformauthz.Authorizer, logger *slog.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		requirement, protected := dictionaryHTTPRequirement(c.FullPath())
+		if !enabled || !protected {
+			c.Next()
+			return
+		}
+		if err := platformauthz.Enforce(c.Request.Context(), authorizer, requirement); err != nil {
+			if errors.Is(err, platformauthz.ErrDecisionUnavailable) {
+				Fail(c, logger, apperror.Unavailable("authorization decision is unavailable", err))
+				return
+			}
+			Fail(c, logger, apperror.Forbidden("permission denied"))
+			return
+		}
+		c.Next()
+	}
+}
+
+func dictionaryHTTPRequirement(route string) (platformauthz.Requirement, bool) {
+	requirements := map[string]platformauthz.Requirement{
+		"/api/v1/dictionaries/create":               {Resource: "dictionary.definition", Action: "create"},
+		"/api/v1/dictionaries/update":               {Resource: "dictionary.definition", Action: "update"},
+		"/api/v1/dictionaries/get":                  {Resource: "dictionary.definition", Action: "read"},
+		"/api/v1/dictionaries/list":                 {Resource: "dictionary.definition", Action: "list"},
+		"/api/v1/dictionaries/items/upsert":         {Resource: "dictionary.item", Action: "update"},
+		"/api/v1/dictionaries/items/list":           {Resource: "dictionary.item", Action: "list"},
+		"/api/v1/dictionaries/items/delete":         {Resource: "dictionary.item", Action: "delete"},
+		"/api/v1/dictionaries/publish":              {Resource: "dictionary.definition", Action: "publish"},
+		"/api/v1/dictionaries/query":                {Resource: "dictionary.data", Action: "query"},
+		"/api/v1/dictionaries/tree":                 {Resource: "dictionary.data", Action: "tree"},
+		"/api/v1/dictionaries/resolve":              {Resource: "dictionary.data", Action: "resolve"},
+		"/api/v1/dictionaries/providers/register":   {Resource: "dictionary.provider", Action: "register"},
+		"/api/v1/dictionaries/providers/heartbeat":  {Resource: "dictionary.provider", Action: "heartbeat"},
+		"/api/v1/dictionaries/providers/unregister": {Resource: "dictionary.provider", Action: "unregister"},
+		"/api/v1/dictionaries/providers/list":       {Resource: "dictionary.provider", Action: "list"},
+	}
+	requirement, ok := requirements[route]
+	return requirement, ok
 }
 
 func Authentication(service *auth.Service, logger *slog.Logger, cfg config.Auth) gin.HandlerFunc {

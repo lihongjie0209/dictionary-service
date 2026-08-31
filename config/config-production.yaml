@@ -44,6 +44,13 @@ auth:
     enabled: true
     key: ""
     grpc_methods: [/platform.dictionary.v1.DictionaryService/RegisterProvider, /platform.dictionary.v1.DictionaryService/HeartbeatProvider, /platform.dictionary.v1.DictionaryService/UnregisterProvider]
+authorization:
+  enabled: true
+outbound:
+  grpc:
+    authorization:
+      target: authorization-service.platform.svc.cluster.local:9090
+      tls: {enabled: true, server_name: authorization-service.platform.svc.cluster.local, ca_file: /etc/platform/tls/ca.crt, cert_file: /etc/platform/tls/tls.crt, key_file: /etc/platform/tls/tls.key}
 event_bus:
   enabled: true
   urls: [nats://nats.platform.svc.cluster.local:4222]

@@ -10,6 +10,7 @@ import (
 	"github.com/lihongjie0209/dictionary-service/internal/config"
 	"github.com/lihongjie0209/dictionary-service/internal/requestid"
 	"github.com/lihongjie0209/microservice-platform-go/principal"
+	dictionaryv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/dictionary/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -18,6 +19,36 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 )
+
+func TestDictionaryGRPCRequirementCoversEveryProtectedBusinessMethod(t *testing.T) {
+	t.Parallel()
+	resolve := dictionaryGRPCRequirement(true)
+	methods := []string{
+		dictionaryv1.DictionaryService_CreateDictionary_FullMethodName, dictionaryv1.DictionaryService_UpdateDictionary_FullMethodName,
+		dictionaryv1.DictionaryService_GetDictionary_FullMethodName, dictionaryv1.DictionaryService_ListDictionaries_FullMethodName,
+		dictionaryv1.DictionaryService_UpsertItems_FullMethodName, dictionaryv1.DictionaryService_DeleteItem_FullMethodName,
+		dictionaryv1.DictionaryService_PublishDictionary_FullMethodName, dictionaryv1.DictionaryService_Query_FullMethodName,
+		dictionaryv1.DictionaryService_Tree_FullMethodName, dictionaryv1.DictionaryService_ResolveCodes_FullMethodName,
+		dictionaryv1.DictionaryService_ListProviders_FullMethodName,
+	}
+	for _, method := range methods {
+		if requirement, ok := resolve(method); !ok || requirement.Resource == "" || requirement.Action == "" {
+			t.Fatalf("method %q requirement = %+v, %v", method, requirement, ok)
+		}
+	}
+	for _, method := range []string{
+		dictionaryv1.DictionaryService_RegisterProvider_FullMethodName,
+		dictionaryv1.DictionaryService_HeartbeatProvider_FullMethodName,
+		dictionaryv1.DictionaryService_UnregisterProvider_FullMethodName,
+	} {
+		if _, ok := resolve(method); ok {
+			t.Fatalf("PSK provider lifecycle method %q must not require a tenant-member decision", method)
+		}
+	}
+	if _, ok := dictionaryGRPCRequirement(false)(methods[0]); ok {
+		t.Fatal("disabled authorization must not call the decision service")
+	}
+}
 
 func TestRequestIDAndAuthenticationThroughGRPC(t *testing.T) {
 	t.Parallel()

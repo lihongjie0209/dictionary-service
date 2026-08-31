@@ -21,6 +21,7 @@ import (
 	"github.com/lihongjie0209/dictionary-service/internal/idempotency"
 	"github.com/lihongjie0209/dictionary-service/internal/observability"
 	"github.com/lihongjie0209/dictionary-service/internal/requestid"
+	platformauthz "github.com/lihongjie0209/microservice-platform-go/authz"
 	"github.com/lihongjie0209/microservice-platform-go/principal"
 
 	dictionaryv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/dictionary/v1"
@@ -42,11 +43,11 @@ type Server struct {
 	logger  *slog.Logger
 }
 
-func NewServer(lc fx.Lifecycle, cfg config.Config, authService *auth.Service, healthService *apphealth.Service, dictionaryService *dictionary.Service, metrics *observability.Metrics, logger *slog.Logger) (*Server, error) {
+func NewServer(lc fx.Lifecycle, cfg config.Config, authService *auth.Service, authorizer platformauthz.Authorizer, healthService *apphealth.Service, dictionaryService *dictionary.Service, metrics *observability.Metrics, logger *slog.Logger) (*Server, error) {
 	options := []grpc.ServerOption{
 		grpc.MaxRecvMsgSize(cfg.GRPC.MaxReceiveBytes),
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
-		grpc.ChainUnaryInterceptor(environmentInterceptor(cfg.Runtime.ActiveProfile), requestIDInterceptor, idempotencyInterceptor, recoveryInterceptor(logger), authInterceptor(authService, cfg.Auth), errorMappingInterceptor, metricsInterceptor(metrics, logger)),
+		grpc.ChainUnaryInterceptor(environmentInterceptor(cfg.Runtime.ActiveProfile), requestIDInterceptor, idempotencyInterceptor, recoveryInterceptor(logger), authInterceptor(authService, cfg.Auth), platformauthz.UnaryServerInterceptor(authorizer, dictionaryGRPCRequirement(cfg.Authorization.Enabled)), errorMappingInterceptor, metricsInterceptor(metrics, logger)),
 		grpc.ChainStreamInterceptor(environmentStreamInterceptor(cfg.Runtime.ActiveProfile), requestIDStreamInterceptor, idempotencyStreamInterceptor, recoveryStreamInterceptor(logger), authStreamInterceptor(authService, cfg.Auth), metricsStreamInterceptor(metrics, logger)),
 	}
 	if cfg.GRPC.TLS.Enabled {
@@ -65,6 +66,29 @@ func NewServer(lc fx.Lifecycle, cfg config.Config, authService *auth.Service, he
 	server := &Server{server: grpcServer, address: cfg.GRPC.Address, logger: logger}
 	lc.Append(fx.Hook{OnStart: server.start(cfg.GRPC.Enabled), OnStop: server.stop})
 	return server, nil
+}
+
+func dictionaryGRPCRequirement(enabled bool) platformauthz.GRPCResolver {
+	return func(method string) (platformauthz.Requirement, bool) {
+		if !enabled {
+			return platformauthz.Requirement{}, false
+		}
+		requirements := map[string]platformauthz.Requirement{
+			dictionaryv1.DictionaryService_CreateDictionary_FullMethodName:  {Resource: "dictionary.definition", Action: "create"},
+			dictionaryv1.DictionaryService_UpdateDictionary_FullMethodName:  {Resource: "dictionary.definition", Action: "update"},
+			dictionaryv1.DictionaryService_GetDictionary_FullMethodName:     {Resource: "dictionary.definition", Action: "read"},
+			dictionaryv1.DictionaryService_ListDictionaries_FullMethodName:  {Resource: "dictionary.definition", Action: "list"},
+			dictionaryv1.DictionaryService_UpsertItems_FullMethodName:       {Resource: "dictionary.item", Action: "update"},
+			dictionaryv1.DictionaryService_DeleteItem_FullMethodName:        {Resource: "dictionary.item", Action: "delete"},
+			dictionaryv1.DictionaryService_PublishDictionary_FullMethodName: {Resource: "dictionary.definition", Action: "publish"},
+			dictionaryv1.DictionaryService_Query_FullMethodName:             {Resource: "dictionary.data", Action: "query"},
+			dictionaryv1.DictionaryService_Tree_FullMethodName:              {Resource: "dictionary.data", Action: "tree"},
+			dictionaryv1.DictionaryService_ResolveCodes_FullMethodName:      {Resource: "dictionary.data", Action: "resolve"},
+			dictionaryv1.DictionaryService_ListProviders_FullMethodName:     {Resource: "dictionary.provider", Action: "list"},
+		}
+		requirement, ok := requirements[method]
+		return requirement, ok
+	}
 }
 
 func errorMappingInterceptor(ctx context.Context, request any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
