@@ -18,8 +18,8 @@ import (
 	"github.com/lihongjie0209/dictionary-service/internal/apperror"
 	"github.com/lihongjie0209/dictionary-service/internal/cache"
 	"github.com/lihongjie0209/dictionary-service/internal/database"
-	"github.com/lihongjie0209/dictionary-service/internal/principal"
 	platformevents "github.com/lihongjie0209/microservice-platform-go/eventbus"
+	"github.com/lihongjie0209/microservice-platform-go/principal"
 	dictionaryv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/dictionary/v1"
 	"google.golang.org/protobuf/proto"
 )
@@ -56,6 +56,9 @@ func (s *Service) Create(ctx context.Context, input DictionaryInput) (Dictionary
 	if err != nil {
 		return Dictionary{}, err
 	}
+	if err := authorizeTenant(ctx, input.TenantID, false); err != nil {
+		return Dictionary{}, err
+	}
 	input, err = validateDictionary(input, true)
 	if err != nil {
 		return Dictionary{}, err
@@ -78,6 +81,9 @@ func (s *Service) Update(ctx context.Context, id string, input DictionaryInput, 
 	if err != nil {
 		return Dictionary{}, translate(err)
 	}
+	if err := authorizeTenant(ctx, current.TenantID, false); err != nil {
+		return Dictionary{}, err
+	}
 	input.TenantID, input.Code = current.TenantID, current.Code
 	input, err = validateDictionary(input, false)
 	if err != nil {
@@ -92,6 +98,9 @@ func (s *Service) Update(ctx context.Context, id string, input DictionaryInput, 
 
 func (s *Service) Get(ctx context.Context, tenantID, code string) (Dictionary, error) {
 	tenantID, code = strings.TrimSpace(tenantID), strings.TrimSpace(code)
+	if err := authorizeTenant(ctx, tenantID, true); err != nil {
+		return Dictionary{}, err
+	}
 	value, err := s.repository.GetDictionary(ctx, tenantID, code)
 	if errors.Is(err, ErrNotFound) && tenantID != "" {
 		value, err = s.repository.GetDictionary(ctx, "", code)
@@ -108,6 +117,9 @@ func (s *Service) Get(ctx context.Context, tenantID, code string) (Dictionary, e
 }
 
 func (s *Service) List(ctx context.Context, tenantID, status, keyword string, page, pageSize int) (Page[Dictionary], error) {
+	if err := authorizeTenant(ctx, tenantID, true); err != nil {
+		return Page[Dictionary]{}, err
+	}
 	page, pageSize, err := pagination(page, pageSize)
 	if err != nil {
 		return Page[Dictionary]{}, err
@@ -124,6 +136,9 @@ func (s *Service) UpsertItems(ctx context.Context, dictionaryID string, items []
 	dictionary, err := s.repository.GetDictionaryByID(ctx, strings.TrimSpace(dictionaryID))
 	if err != nil {
 		return nil, translate(err)
+	}
+	if err := authorizeTenant(ctx, dictionary.TenantID, false); err != nil {
+		return nil, err
 	}
 	if dictionary.Kind != KindStatic {
 		return nil, apperror.Conflict("dynamic dictionaries cannot store static items", nil)
@@ -172,6 +187,9 @@ func (s *Service) ListDraftItems(ctx context.Context, dictionaryID string) ([]It
 	if err != nil {
 		return nil, translate(err)
 	}
+	if err := authorizeTenant(ctx, dictionary.TenantID, false); err != nil {
+		return nil, err
+	}
 	if dictionary.Kind != KindStatic {
 		return nil, apperror.Conflict("dynamic dictionaries do not have draft items", nil)
 	}
@@ -187,6 +205,13 @@ func (s *Service) DeleteItem(ctx context.Context, id string, expected int64) err
 	item, err := s.repository.GetDraftItem(ctx, id)
 	if err != nil {
 		return translate(err)
+	}
+	dictionary, err := s.repository.GetDictionaryByID(ctx, item.DictionaryID)
+	if err != nil {
+		return translate(err)
+	}
+	if err := authorizeTenant(ctx, dictionary.TenantID, false); err != nil {
+		return err
 	}
 	items, err := s.repository.ListDraftItems(ctx, item.DictionaryID)
 	if err != nil {
@@ -206,6 +231,13 @@ func (s *Service) Publish(ctx context.Context, dictionaryID string, expected int
 	if err != nil {
 		return Release{}, nil, err
 	}
+	dictionary, err := s.repository.GetDictionaryByID(ctx, strings.TrimSpace(dictionaryID))
+	if err != nil {
+		return Release{}, nil, translate(err)
+	}
+	if err := authorizeTenant(ctx, dictionary.TenantID, false); err != nil {
+		return Release{}, nil, err
+	}
 	if s.locker == nil {
 		return Release{}, nil, apperror.Unavailable("dictionary publish lock unavailable", nil)
 	}
@@ -217,10 +249,6 @@ func (s *Service) Publish(ctx context.Context, dictionaryID string, expected int
 		return Release{}, nil, apperror.Conflict("dictionary publication is already running", nil)
 	}
 	defer func() { _ = mutex.Unlock(context.WithoutCancel(ctx)) }()
-	dictionary, err := s.repository.GetDictionaryByID(ctx, dictionaryID)
-	if err != nil {
-		return Release{}, nil, translate(err)
-	}
 	items, err := s.repository.ListDraftItems(ctx, dictionaryID)
 	if err != nil {
 		return Release{}, nil, translate(err)
@@ -795,10 +823,30 @@ func defaultJSON(value string) string {
 }
 func actor(ctx context.Context) (string, error) {
 	value, ok := principal.FromContext(ctx)
-	if !ok || strings.TrimSpace(value.Subject) == "" {
+	if !ok || strings.TrimSpace(value.ID) == "" {
 		return "", apperror.Unauthorized("authenticated actor is required")
 	}
-	return value.Subject, nil
+	return value.ID, nil
+}
+
+func authorizeTenant(ctx context.Context, tenantID string, allowGlobal bool) error {
+	identity, ok := principal.FromContext(ctx)
+	if !ok {
+		return apperror.Unauthorized("authenticated actor is required")
+	}
+	switch identity.Type {
+	case principal.TypeServiceAccount, principal.TypeSystem:
+		return nil
+	case principal.TypeUser:
+		requested := strings.TrimSpace(tenantID)
+		if allowGlobal && requested == "" {
+			return nil
+		}
+		if identity.TenantID != "" && identity.TenantID == requested {
+			return nil
+		}
+	}
+	return apperror.Forbidden("tenant access denied")
 }
 func translate(err error) error {
 	if err == nil {

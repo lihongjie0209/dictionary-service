@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"testing"
+
+	"github.com/lihongjie0209/dictionary-service/internal/apperror"
+	"github.com/lihongjie0209/microservice-platform-go/principal"
 )
 
 type draftItemsRepository struct {
@@ -50,7 +53,7 @@ func TestListDraftItemsReturnsEditableStaticItems(t *testing.T) {
 		items:      []Item{{ID: "item-1", DictionaryID: "dictionary-1", Code: "active"}},
 	}
 	service := NewService(repository, nil, nil, nil)
-	items, err := service.ListDraftItems(t.Context(), " dictionary-1 ")
+	items, err := service.ListDraftItems(systemContext(t), " dictionary-1 ")
 	if err != nil || len(items) != 1 || items[0].ID != "item-1" {
 		t.Fatalf("ListDraftItems() = (%+v, %v)", items, err)
 	}
@@ -59,9 +62,51 @@ func TestListDraftItemsReturnsEditableStaticItems(t *testing.T) {
 func TestListDraftItemsRejectsDynamicDictionary(t *testing.T) {
 	t.Parallel()
 	service := NewService(draftItemsRepository{dictionary: Dictionary{ID: "dictionary-1", Kind: KindDynamic}}, nil, nil, nil)
-	if _, err := service.ListDraftItems(t.Context(), "dictionary-1"); err == nil {
+	if _, err := service.ListDraftItems(systemContext(t), "dictionary-1"); err == nil {
 		t.Fatal("ListDraftItems() accepted a dynamic dictionary")
 	}
+}
+
+func TestAuthorizeTenant(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		identity    principal.Principal
+		tenantID    string
+		allowGlobal bool
+		wantCode    int
+	}{
+		{name: "matching tenant", identity: principal.Principal{ID: "user-1", Type: principal.TypeUser, TenantID: "tenant-1"}, tenantID: "tenant-1"},
+		{name: "different tenant", identity: principal.Principal{ID: "user-1", Type: principal.TypeUser, TenantID: "tenant-1"}, tenantID: "tenant-2", wantCode: apperror.CodeForbidden},
+		{name: "global dictionary", identity: principal.Principal{ID: "user-1", Type: principal.TypeUser, TenantID: "tenant-1"}, allowGlobal: true},
+		{name: "global mutation denied", identity: principal.Principal{ID: "user-1", Type: principal.TypeUser, TenantID: "tenant-1"}, wantCode: apperror.CodeForbidden},
+		{name: "service account", identity: principal.Principal{ID: "service-1", Type: principal.TypeServiceAccount}, tenantID: "tenant-2"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := principal.WithContext(t.Context(), test.identity)
+			if got := applicationErrorCode(authorizeTenant(ctx, test.tenantID, test.allowGlobal)); got != test.wantCode {
+				t.Fatalf("authorizeTenant() code = %d, want %d", got, test.wantCode)
+			}
+		})
+	}
+}
+
+func systemContext(t *testing.T) context.Context {
+	t.Helper()
+	return principal.SystemContext(t.Context(), "test-system")
+}
+
+func applicationErrorCode(err error) int {
+	if err == nil {
+		return 0
+	}
+	var appErr *apperror.Error
+	if errors.As(err, &appErr) {
+		return appErr.Code
+	}
+	return -1
 }
 
 func TestBuildTree(t *testing.T) {

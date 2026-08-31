@@ -12,7 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lihongjie0209/dictionary-service/internal/auth"
 	"github.com/lihongjie0209/dictionary-service/internal/config"
-	"github.com/lihongjie0209/dictionary-service/internal/principal"
+	"github.com/lihongjie0209/microservice-platform-go/principal"
 )
 
 func TestRequestID(t *testing.T) {
@@ -60,7 +60,7 @@ func TestAuthentication_PSKPrecedesSkipAndJWT(t *testing.T) {
 			}))
 			router.POST("/api/v1/external/callback", func(c *gin.Context) {
 				value, ok := principal.FromContext(c.Request.Context())
-				if test.status == http.StatusOK && (!ok || value.Subject != "psk" || value.Method != principal.AuthenticationPSK) {
+				if test.status == http.StatusOK && (!ok || value.ID != "psk" || value.Type != principal.TypeSystem) {
 					c.AbortWithStatus(http.StatusInternalServerError)
 					return
 				}
