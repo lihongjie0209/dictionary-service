@@ -1,0 +1,1 @@
+DROP INDEX dictionary_outbox_retention_idx;

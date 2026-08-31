@@ -47,12 +47,34 @@ func (r *dictionaryEventRuntime) start(ctx context.Context) error {
 	r.bus = bus
 	runCtx, cancel := context.WithCancel(context.Background())
 	r.cancel = cancel
+	cleaner, err := platformoutbox.NewRetentionCleaner(r.store, platformoutbox.RetentionConfig{Retention: r.config.EventBus.PublishedRetention, BatchSize: r.config.EventBus.CleanupBatchSize})
+	if err != nil {
+		cancel()
+		_ = bus.Close()
+		return err
+	}
 	r.wg.Go(func() {
 		ticker := time.NewTicker(r.config.EventBus.DispatchInterval)
 		defer ticker.Stop()
 		for {
 			if _, err := dispatcher.RunOnce(runCtx); err != nil && !errors.Is(err, context.Canceled) {
 				r.logger.ErrorContext(runCtx, "dispatch dictionary outbox failed", "error", err)
+			}
+			select {
+			case <-runCtx.Done():
+				return
+			case <-ticker.C:
+			}
+		}
+	})
+	r.wg.Go(func() {
+		ticker := time.NewTicker(r.config.EventBus.CleanupInterval)
+		defer ticker.Stop()
+		for {
+			if deleted, runErr := cleaner.RunOnce(runCtx); runErr != nil && !errors.Is(runErr, context.Canceled) {
+				r.logger.ErrorContext(runCtx, "clean published dictionary outbox events", "error", runErr)
+			} else if deleted > 0 {
+				r.logger.InfoContext(runCtx, "published dictionary outbox events cleaned", "deleted", deleted)
 			}
 			select {
 			case <-runCtx.Done():
