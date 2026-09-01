@@ -24,6 +24,7 @@ type AuditFields struct {
 type Dictionary struct {
 	ID               string `db:"id" json:"id"`
 	TenantID         string `db:"tenant_id" json:"tenant_id"`
+	ApplicationID    string `db:"application_id" json:"application_id"`
 	Code             string `db:"code" json:"code"`
 	Name             string `db:"name" json:"name"`
 	Description      string `db:"description" json:"description"`
@@ -107,9 +108,9 @@ type ProviderPage struct {
 
 type ProviderGateway interface {
 	ValidateTarget(string) error
-	Query(context.Context, Provider, string, string, Search) (ProviderPage, error)
-	Tree(context.Context, Provider, string, string, string, string, string, int, int, map[string]string) ([]TreeNode, bool, error)
-	ResolveCodes(context.Context, Provider, string, string, []string) (map[string]Item, error)
+	Query(context.Context, Provider, string, string, string, Search) (ProviderPage, error)
+	Tree(context.Context, Provider, string, string, string, string, string, string, int, int, map[string]string) ([]TreeNode, bool, error)
+	ResolveCodes(context.Context, Provider, string, string, string, []string) (map[string]Item, error)
 }
 
 type ProviderResolver interface {

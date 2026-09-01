@@ -1040,6 +1040,9 @@ const docTemplate = `{
                 "name"
             ],
             "properties": {
+                "application_id": {
+                    "type": "string"
+                },
                 "code": {
                     "type": "string"
                 },
@@ -1095,6 +1098,9 @@ const docTemplate = `{
         "httptransport.DictionaryView": {
             "type": "object",
             "properties": {
+                "application_id": {
+                    "type": "string"
+                },
                 "code": {
                     "type": "string"
                 },
@@ -1148,6 +1154,9 @@ const docTemplate = `{
                 "code"
             ],
             "properties": {
+                "application_id": {
+                    "type": "string"
+                },
                 "code": {
                     "type": "string"
                 },
@@ -1223,6 +1232,9 @@ const docTemplate = `{
         "httptransport.ListDictionariesRequest": {
             "type": "object",
             "properties": {
+                "application_id": {
+                    "type": "string"
+                },
                 "keyword": {
                     "type": "string"
                 },
@@ -1415,6 +1427,9 @@ const docTemplate = `{
                 "dictionary_code"
             ],
             "properties": {
+                "application_id": {
+                    "type": "string"
+                },
                 "cursor": {
                     "type": "string"
                 },
@@ -1514,6 +1529,9 @@ const docTemplate = `{
                 "dictionary_code"
             ],
             "properties": {
+                "application_id": {
+                    "type": "string"
+                },
                 "codes": {
                     "type": "array",
                     "items": {
@@ -1564,6 +1582,9 @@ const docTemplate = `{
                 "mode"
             ],
             "properties": {
+                "application_id": {
+                    "type": "string"
+                },
                 "dictionary_code": {
                     "type": "string"
                 },

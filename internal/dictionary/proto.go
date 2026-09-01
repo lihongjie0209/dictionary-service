@@ -12,6 +12,7 @@ func ToProtoDictionary(value Dictionary) *dictionaryv1.Dictionary {
 	return &dictionaryv1.Dictionary{
 		Id:               value.ID,
 		TenantId:         value.TenantID,
+		ApplicationId:    value.ApplicationID,
 		Code:             value.Code,
 		Name:             value.Name,
 		Description:      value.Description,

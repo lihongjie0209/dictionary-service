@@ -17,6 +17,7 @@ import (
 	"github.com/lihongjie0209/dictionary-service/internal/app"
 	"github.com/lihongjie0209/dictionary-service/internal/auth"
 	"github.com/lihongjie0209/dictionary-service/internal/config"
+	applicationv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/application/v1"
 	commonv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/common/v1"
 	dictionaryv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/dictionary/v1"
 	"github.com/nats-io/nats.go"
@@ -77,6 +78,7 @@ func TestHTTPAndGRPCEndToEnd(t *testing.T) {
 	httpAddress := freeAddress(t)
 	grpcAddress := freeAddress(t)
 	const secret = "01234567890123456789012345678901"
+	applicationAddress := startAllowApplicationServer(t)
 	cfg := config.Config{
 		Runtime:        config.Runtime{ActiveProfile: "integration"},
 		App:            config.App{Name: "integration", Env: "integration", ShutdownTimeout: 10 * time.Second},
@@ -95,6 +97,7 @@ func TestHTTPAndGRPCEndToEnd(t *testing.T) {
 		User:           config.User{CacheTTL: time.Minute, LockTTL: 10 * time.Second, LockRetryDelay: 20 * time.Millisecond},
 		Idempotency:    config.Idempotency{Enabled: true, ProcessingTTL: 30 * time.Second, ResultTTL: time.Hour, FailureTTL: time.Minute},
 		EventBus:       config.EventBus{Enabled: true, URLs: []string{natsURL}, StreamName: "PLATFORM_EVENTS", Subjects: []string{"platform.>"}, Storage: "memory", MaxAge: time.Hour, DuplicateWindow: time.Minute, ConnectTimeout: 5 * time.Second, ReconnectWait: time.Second, PublishTimeout: 5 * time.Second, ConsumerAckWait: 30 * time.Second, ConsumerMaxDeliver: 3, DispatchInterval: 20 * time.Millisecond, DispatchBatchSize: 20, DispatchLease: 30 * time.Second, DispatchRetryDelay: 100 * time.Millisecond, PublishedRetention: time.Hour, CleanupInterval: time.Hour, CleanupBatchSize: 20},
+		Outbound:       config.Outbound{GRPC: map[string]config.GRPCUpstream{"application": {Target: applicationAddress, Timeout: 2 * time.Second}}},
 	}
 	application := app.New(cfg)
 	if err := application.Start(ctx); err != nil {
@@ -129,7 +132,7 @@ func TestHTTPAndGRPCEndToEnd(t *testing.T) {
 	if status := postJSON(t, baseURL+"/api/v1/me", "Bearer "+token, "", `{}`); status != http.StatusOK {
 		t.Fatalf("JWT status = %d", status)
 	}
-	created := postSuccess(t, baseURL+"/api/v1/dictionaries/create", "Bearer "+token, `{"code":"order.status","name":"Order status","metadata_json":"{}"}`)
+	created := postSuccess(t, baseURL+"/api/v1/dictionaries/create", "Bearer "+token, `{"tenant_id":"tenant-1","application_id":"application-1","code":"order.status","name":"Order status","metadata_json":"{}"}`)
 	var dictionaryValue struct {
 		ID      string `json:"id"`
 		Version int64  `json:"version"`
@@ -142,10 +145,10 @@ func TestHTTPAndGRPCEndToEnd(t *testing.T) {
 		t.Fatalf("dictionary published event: %v", err)
 	}
 	envelope := &commonv1.EventEnvelope{}
-	if err := proto.Unmarshal(publishedMessage.Data, envelope); err != nil || envelope.GetEventType() != "platform.dictionary.v1.DictionaryPublished" || envelope.GetAggregateId() != dictionaryValue.ID {
+	if err := proto.Unmarshal(publishedMessage.Data, envelope); err != nil || envelope.GetEventType() != "platform.dictionary.v1.DictionaryPublished" || envelope.GetAggregateId() != dictionaryValue.ID || envelope.GetTenantId() != "tenant-1" || envelope.GetApplicationId() != "application-1" {
 		t.Fatalf("published envelope = %+v, error=%v", envelope, err)
 	}
-	queried := postSuccess(t, baseURL+"/api/v1/dictionaries/query", "Bearer "+token, `{"dictionary_code":"order.status","keyword":"paid","page":1,"page_size":20}`)
+	queried := postSuccess(t, baseURL+"/api/v1/dictionaries/query", "Bearer "+token, `{"tenant_id":"tenant-1","application_id":"application-1","dictionary_code":"order.status","keyword":"paid","page":1,"page_size":20}`)
 	var queryResult struct {
 		Items []struct {
 			Code string `json:"code"`
@@ -170,6 +173,34 @@ func TestHTTPAndGRPCEndToEnd(t *testing.T) {
 	if _, err := dictionaryv1.NewDictionaryServiceClient(connection).RegisterProvider(pskCtx, &dictionaryv1.RegisterProviderRequest{ServiceName: "integration-provider", Target: "integration-service:9090", Capabilities: []*dictionaryv1.ProviderCapability{{DictionaryCode: "integration.values"}}, LeaseSeconds: 60}); err != nil {
 		t.Fatalf("PSK RegisterProvider: %v", err)
 	}
+}
+
+type allowApplicationServer struct {
+	applicationv1.UnimplementedApplicationServiceServer
+}
+
+func (allowApplicationServer) BatchCheckTenantApplications(_ context.Context, request *applicationv1.BatchCheckTenantApplicationsRequest) (*applicationv1.BatchCheckTenantApplicationsResponse, error) {
+	decisions := make([]*applicationv1.TenantApplicationDecision, 0, len(request.GetApplicationIds()))
+	for _, applicationID := range request.GetApplicationIds() {
+		decisions = append(decisions, &applicationv1.TenantApplicationDecision{ApplicationId: applicationID, Granted: true})
+	}
+	return &applicationv1.BatchCheckTenantApplicationsResponse{Decisions: decisions}, nil
+}
+
+func startAllowApplicationServer(t *testing.T) string {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := grpc.NewServer()
+	applicationv1.RegisterApplicationServiceServer(server, allowApplicationServer{})
+	go func() { _ = server.Serve(listener) }()
+	t.Cleanup(func() {
+		server.Stop()
+		_ = listener.Close()
+	})
+	return listener.Addr().String()
 }
 
 func freeAddress(t *testing.T) string {

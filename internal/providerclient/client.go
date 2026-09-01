@@ -130,10 +130,11 @@ func (c *Client) ValidateTarget(target string) error {
 	return fmt.Errorf("provider host %q is outside allowed DNS suffixes", host)
 }
 
-func (c *Client) Query(ctx context.Context, provider dictionary.Provider, tenantID, code string, search dictionary.Search) (dictionary.ProviderPage, error) {
+func (c *Client) Query(ctx context.Context, provider dictionary.Provider, tenantID, applicationID, code string, search dictionary.Search) (dictionary.ProviderPage, error) {
 	request := &dictionaryv1.DictionaryProviderServiceQueryRequest{
 		Query: &dictionaryv1.QueryRequest{
 			TenantId:       tenantID,
+			ApplicationId:  applicationID,
 			DictionaryCode: code,
 			Search: &dictionaryv1.SearchSpec{
 				Keyword:    search.Keyword,
@@ -164,8 +165,8 @@ func (c *Client) Query(ctx context.Context, provider dictionary.Provider, tenant
 	return dictionary.ProviderPage{Items: items, Total: int64(page.GetTotal()), Page: int(page.GetPage()), PageSize: int(page.GetPageSize()), NextCursor: result.GetResult().GetNextCursor(), HasMore: result.GetResult().GetHasMore()}, nil
 }
 
-func (c *Client) Tree(ctx context.Context, provider dictionary.Provider, tenantID, code, mode, parentID, keyword string, maxDepth, maxNodes int, filters map[string]string) ([]dictionary.TreeNode, bool, error) {
-	request := &dictionaryv1.DictionaryProviderServiceTreeRequest{Query: &dictionaryv1.TreeRequest{TenantId: tenantID, DictionaryCode: code, Mode: protoTreeMode(mode), ParentId: parentID, Keyword: keyword, MaxDepth: uint32(maxDepth), MaxNodes: uint32(maxNodes), Filters: filters}}
+func (c *Client) Tree(ctx context.Context, provider dictionary.Provider, tenantID, applicationID, code, mode, parentID, keyword string, maxDepth, maxNodes int, filters map[string]string) ([]dictionary.TreeNode, bool, error) {
+	request := &dictionaryv1.DictionaryProviderServiceTreeRequest{Query: &dictionaryv1.TreeRequest{TenantId: tenantID, ApplicationId: applicationID, DictionaryCode: code, Mode: protoTreeMode(mode), ParentId: parentID, Keyword: keyword, MaxDepth: uint32(maxDepth), MaxNodes: uint32(maxNodes), Filters: filters}}
 	response := &dictionaryv1.DictionaryProviderServiceTreeResponse{}
 	if err := c.call(ctx, provider, "tree", request, response, func(client dictionaryv1.DictionaryProviderServiceClient, callCtx context.Context) (proto.Message, error) {
 		return client.Tree(callCtx, request)
@@ -175,8 +176,8 @@ func (c *Client) Tree(ctx context.Context, provider dictionary.Provider, tenantI
 	return fromProtoTree(response.GetResult().GetRoots()), response.GetResult().GetTruncated(), nil
 }
 
-func (c *Client) ResolveCodes(ctx context.Context, provider dictionary.Provider, tenantID, code string, codes []string) (map[string]dictionary.Item, error) {
-	request := &dictionaryv1.DictionaryProviderServiceResolveCodesRequest{Query: &dictionaryv1.ResolveCodesRequest{TenantId: tenantID, DictionaryCode: code, Codes: codes}}
+func (c *Client) ResolveCodes(ctx context.Context, provider dictionary.Provider, tenantID, applicationID, code string, codes []string) (map[string]dictionary.Item, error) {
+	request := &dictionaryv1.DictionaryProviderServiceResolveCodesRequest{Query: &dictionaryv1.ResolveCodesRequest{TenantId: tenantID, ApplicationId: applicationID, DictionaryCode: code, Codes: codes}}
 	response := &dictionaryv1.DictionaryProviderServiceResolveCodesResponse{}
 	if err := c.call(ctx, provider, "resolve", request, response, func(client dictionaryv1.DictionaryProviderServiceClient, callCtx context.Context) (proto.Message, error) {
 		return client.ResolveCodes(callCtx, request)

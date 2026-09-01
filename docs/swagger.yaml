@@ -58,6 +58,8 @@ definitions:
     type: object
   httptransport.CreateDictionaryRequest:
     properties:
+      application_id:
+        type: string
       code:
         type: string
       description:
@@ -97,6 +99,8 @@ definitions:
     type: object
   httptransport.DictionaryView:
     properties:
+      application_id:
+        type: string
       code:
         type: string
       created_at:
@@ -130,6 +134,8 @@ definitions:
     type: object
   httptransport.GetDictionaryRequest:
     properties:
+      application_id:
+        type: string
       code:
         type: string
       tenant_id:
@@ -181,6 +187,8 @@ definitions:
     type: object
   httptransport.ListDictionariesRequest:
     properties:
+      application_id:
+        type: string
       keyword:
         type: string
       page:
@@ -304,6 +312,8 @@ definitions:
     type: object
   httptransport.QueryDictionaryRequest:
     properties:
+      application_id:
+        type: string
       cursor:
         type: string
       descending:
@@ -369,6 +379,8 @@ definitions:
     type: object
   httptransport.ResolveCodesRequest:
     properties:
+      application_id:
+        type: string
       codes:
         items:
           type: string
@@ -402,6 +414,8 @@ definitions:
     type: object
   httptransport.TreeDictionaryRequest:
     properties:
+      application_id:
+        type: string
       dictionary_code:
         type: string
       keyword:

@@ -17,7 +17,7 @@ type dictionaryServer struct {
 }
 
 func (s *dictionaryServer) CreateDictionary(ctx context.Context, request *dictionaryv1.CreateDictionaryRequest) (*dictionaryv1.CreateDictionaryResponse, error) {
-	value, err := s.service.Create(ctx, dictionary.DictionaryInput{TenantID: request.GetTenantId(), Code: request.GetCode(), Name: request.GetName(), Description: request.GetDescription(), MetadataJSON: structJSON(request.GetMetadata())})
+	value, err := s.service.Create(ctx, dictionary.DictionaryInput{TenantID: request.GetTenantId(), ApplicationID: request.GetApplicationId(), Code: request.GetCode(), Name: request.GetName(), Description: request.GetDescription(), MetadataJSON: structJSON(request.GetMetadata())})
 	return &dictionaryv1.CreateDictionaryResponse{Dictionary: dictionary.ToProtoDictionary(value)}, err
 }
 func (s *dictionaryServer) UpdateDictionary(ctx context.Context, request *dictionaryv1.UpdateDictionaryRequest) (*dictionaryv1.UpdateDictionaryResponse, error) {
@@ -25,12 +25,12 @@ func (s *dictionaryServer) UpdateDictionary(ctx context.Context, request *dictio
 	return &dictionaryv1.UpdateDictionaryResponse{Dictionary: dictionary.ToProtoDictionary(value)}, err
 }
 func (s *dictionaryServer) GetDictionary(ctx context.Context, request *dictionaryv1.GetDictionaryRequest) (*dictionaryv1.GetDictionaryResponse, error) {
-	value, err := s.service.Get(ctx, request.GetTenantId(), request.GetCode())
+	value, err := s.service.Get(ctx, request.GetTenantId(), request.GetApplicationId(), request.GetCode())
 	return &dictionaryv1.GetDictionaryResponse{Dictionary: dictionary.ToProtoDictionary(value)}, err
 }
 func (s *dictionaryServer) ListDictionaries(ctx context.Context, request *dictionaryv1.ListDictionariesRequest) (*dictionaryv1.ListDictionariesResponse, error) {
 	page, size := pageValues(request.GetPage())
-	value, err := s.service.List(ctx, request.GetTenantId(), request.GetStatus(), request.GetKeyword(), page, size)
+	value, err := s.service.List(ctx, request.GetTenantId(), request.GetApplicationId(), request.GetStatus(), request.GetKeyword(), page, size)
 	items := make([]*dictionaryv1.Dictionary, 0, len(value.Items))
 	for _, item := range value.Items {
 		items = append(items, dictionary.ToProtoDictionary(item))
@@ -66,7 +66,7 @@ func (s *dictionaryServer) Query(ctx context.Context, request *dictionaryv1.Quer
 	if search != nil {
 		page, size = pageValues(search.GetPage())
 	}
-	value, err := s.service.Query(ctx, request.GetTenantId(), request.GetDictionaryCode(), dictionary.Search{Keyword: search.GetKeyword(), Filters: search.GetFilters(), Sort: search.GetSort(), Descending: search.GetDescending(), Page: page, PageSize: size, Cursor: search.GetCursor(), Limit: int(search.GetLimit())})
+	value, err := s.service.Query(ctx, request.GetTenantId(), request.GetApplicationId(), request.GetDictionaryCode(), dictionary.Search{Keyword: search.GetKeyword(), Filters: search.GetFilters(), Sort: search.GetSort(), Descending: search.GetDescending(), Page: page, PageSize: size, Cursor: search.GetCursor(), Limit: int(search.GetLimit())})
 	items := make([]*dictionaryv1.DictionaryItem, 0, len(value.Items))
 	for _, item := range value.Items {
 		items = append(items, dictionary.ToProtoItem(item))
@@ -74,11 +74,11 @@ func (s *dictionaryServer) Query(ctx context.Context, request *dictionaryv1.Quer
 	return &dictionaryv1.QueryResponse{Items: items, Result: &dictionaryv1.ResultPage{Page: &commonv1.PageResult{Page: uint32(value.Page), PageSize: uint32(value.PageSize), Total: uint64(value.Total)}, NextCursor: value.NextCursor, HasMore: value.HasMore}}, err
 }
 func (s *dictionaryServer) Tree(ctx context.Context, request *dictionaryv1.TreeRequest) (*dictionaryv1.TreeResponse, error) {
-	value, truncated, err := s.service.Tree(ctx, request.GetTenantId(), request.GetDictionaryCode(), treeMode(request.GetMode()), request.GetParentId(), request.GetKeyword(), int(request.GetMaxDepth()), int(request.GetMaxNodes()))
+	value, truncated, err := s.service.Tree(ctx, request.GetTenantId(), request.GetApplicationId(), request.GetDictionaryCode(), treeMode(request.GetMode()), request.GetParentId(), request.GetKeyword(), int(request.GetMaxDepth()), int(request.GetMaxNodes()))
 	return &dictionaryv1.TreeResponse{Roots: dictionary.ToProtoTree(value), Truncated: truncated}, err
 }
 func (s *dictionaryServer) ResolveCodes(ctx context.Context, request *dictionaryv1.ResolveCodesRequest) (*dictionaryv1.ResolveCodesResponse, error) {
-	values, err := s.service.ResolveCodes(ctx, request.GetTenantId(), request.GetDictionaryCode(), request.GetCodes())
+	values, err := s.service.ResolveCodes(ctx, request.GetTenantId(), request.GetApplicationId(), request.GetDictionaryCode(), request.GetCodes())
 	result := make([]*dictionaryv1.ResolvedCode, 0, len(request.GetCodes()))
 	for _, code := range request.GetCodes() {
 		item, found := values[code]

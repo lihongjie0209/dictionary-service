@@ -4,15 +4,51 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/lihongjie0209/dictionary-service/internal/apperror"
+	"github.com/lihongjie0209/microservice-platform-go/appaccess"
 	"github.com/lihongjie0209/microservice-platform-go/principal"
+	commonv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/common/v1"
+	dictionaryv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/dictionary/v1"
+	"google.golang.org/protobuf/proto"
 )
 
 type draftItemsRepository struct {
 	Repository
 	dictionary Dictionary
 	items      []Item
+}
+
+type scopeRepository struct {
+	Repository
+	values map[string]Dictionary
+	calls  []string
+}
+
+func (r *scopeRepository) GetDictionary(_ context.Context, tenantID, applicationID, code string) (Dictionary, error) {
+	key := tenantID + "/" + applicationID + "/" + code
+	r.calls = append(r.calls, key)
+	value, ok := r.values[key]
+	if !ok {
+		return Dictionary{}, ErrNotFound
+	}
+	return value, nil
+}
+
+type applicationVerifier struct{ err error }
+
+func (v applicationVerifier) Verify(context.Context, string, string) error { return v.err }
+
+type outboxRepository struct {
+	Repository
+	event OutboxEvent
+}
+
+func (r *outboxRepository) AddOutbox(_ context.Context, _ sqlx.ExtContext, event OutboxEvent) error {
+	r.event = event
+	return nil
 }
 
 func (r draftItemsRepository) GetDictionaryByID(context.Context, string) (Dictionary, error) {
@@ -67,16 +103,18 @@ func TestListDraftItemsRejectsDynamicDictionary(t *testing.T) {
 	}
 }
 
-func TestAuthorizeTenant(t *testing.T) {
+func TestAuthorizeScope(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name        string
-		identity    principal.Principal
-		tenantID    string
-		allowGlobal bool
-		wantCode    int
+		name          string
+		identity      principal.Principal
+		tenantID      string
+		applicationID string
+		allowGlobal   bool
+		wantCode      int
 	}{
 		{name: "matching tenant", identity: principal.Principal{ID: "user-1", Type: principal.TypeUser, TenantID: "tenant-1"}, tenantID: "tenant-1"},
+		{name: "matching application", identity: principal.Principal{ID: "user-1", Type: principal.TypeUser, TenantID: "tenant-1"}, tenantID: "tenant-1", applicationID: "application-1"},
 		{name: "different tenant", identity: principal.Principal{ID: "user-1", Type: principal.TypeUser, TenantID: "tenant-1"}, tenantID: "tenant-2", wantCode: apperror.CodeForbidden},
 		{name: "global dictionary", identity: principal.Principal{ID: "user-1", Type: principal.TypeUser, TenantID: "tenant-1"}, allowGlobal: true},
 		{name: "global mutation denied", identity: principal.Principal{ID: "user-1", Type: principal.TypeUser, TenantID: "tenant-1"}, wantCode: apperror.CodeForbidden},
@@ -86,10 +124,72 @@ func TestAuthorizeTenant(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := principal.WithContext(t.Context(), test.identity)
-			if got := applicationErrorCode(authorizeTenant(ctx, test.tenantID, test.allowGlobal)); got != test.wantCode {
-				t.Fatalf("authorizeTenant() code = %d, want %d", got, test.wantCode)
+			service := NewService(nil, nil, nil, nil)
+			if got := applicationErrorCode(service.authorizeScope(ctx, test.tenantID, test.applicationID, test.allowGlobal)); got != test.wantCode {
+				t.Fatalf("authorizeScope() code = %d, want %d", got, test.wantCode)
 			}
 		})
+	}
+}
+
+func TestGetResolvesApplicationThenTenantThenPlatform(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		name   string
+		values map[string]Dictionary
+		wantID string
+		calls  int
+	}{
+		{name: "application override", values: map[string]Dictionary{"tenant-1/application-1/order.status": {ID: "application"}}, wantID: "application", calls: 1},
+		{name: "tenant fallback", values: map[string]Dictionary{"tenant-1//order.status": {ID: "tenant"}}, wantID: "tenant", calls: 2},
+		{name: "platform fallback", values: map[string]Dictionary{"//order.status": {ID: "platform"}}, wantID: "platform", calls: 3},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			repository := &scopeRepository{values: test.values}
+			service := NewService(repository, nil, nil, nil)
+			value, err := service.Get(systemContext(t), "tenant-1", "application-1", "order.status")
+			if err != nil || value.ID != test.wantID || len(repository.calls) != test.calls {
+				t.Fatalf("Get() = (%+v, %v), calls=%v", value, err, repository.calls)
+			}
+		})
+	}
+}
+
+func TestAuthorizeScopeRejectsMissingApplicationGrant(t *testing.T) {
+	t.Parallel()
+
+	service := NewService(nil, nil, nil, nil)
+	service.applications = applicationVerifier{err: appaccess.ErrNotGranted}
+	ctx := principal.WithContext(t.Context(), principal.Principal{ID: "user-1", Type: principal.TypeUser, TenantID: "tenant-1"})
+	if code := applicationErrorCode(service.authorizeScope(ctx, "tenant-1", "application-1", true)); code != apperror.CodeForbidden {
+		t.Fatalf("authorizeScope() code = %d", code)
+	}
+}
+
+func TestAddEventPreservesApplicationScope(t *testing.T) {
+	t.Parallel()
+
+	repository := &outboxRepository{}
+	service := NewService(repository, nil, nil, nil)
+	at := time.Date(2026, time.September, 2, 10, 0, 0, 0, time.FixedZone("UTC+8", 8*60*60))
+	err := service.addEvent(
+		t.Context(), nil,
+		"platform.dictionary.dictionary.published.v1",
+		"platform.dictionary.v1.DictionaryPublished",
+		"dictionary-1", "dictionary", "tenant-1", "application-1", "actor-1", at,
+		&dictionaryv1.DictionaryPublishedEvent{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var envelope commonv1.EventEnvelope
+	if err := proto.Unmarshal(repository.event.Envelope, &envelope); err != nil {
+		t.Fatal(err)
+	}
+	if envelope.GetTenantId() != "tenant-1" || envelope.GetApplicationId() != "application-1" {
+		t.Fatalf("event scope = %q/%q", envelope.GetTenantId(), envelope.GetApplicationId())
 	}
 }
 

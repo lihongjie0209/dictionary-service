@@ -40,7 +40,7 @@ func TestClient_QueryUsesProviderAndRedisCache(t *testing.T) {
 	t.Cleanup(func() { _ = client.Close() })
 	provider := dictionary.Provider{ID: "provider-1", ServiceName: "tenant-service", Target: "tenant-service:9090", CacheTTLSeconds: 60, TimeoutMilliseconds: 1000}
 	for attempt := 0; attempt < 2; attempt++ {
-		page, err := client.Query(t.Context(), provider, "tenant-1", "tenant.organization_units", dictionary.Search{Page: 1, PageSize: 20})
+		page, err := client.Query(t.Context(), provider, "tenant-1", "application-1", "tenant.organization_units", dictionary.Search{Page: 1, PageSize: 20})
 		if err != nil {
 			t.Fatalf("Query() error = %v", err)
 		}
@@ -50,6 +50,9 @@ func TestClient_QueryUsesProviderAndRedisCache(t *testing.T) {
 	}
 	if calls := providerServer.calls.Load(); calls != 1 {
 		t.Fatalf("provider Query calls = %d, want 1 due to cache", calls)
+	}
+	if applicationID, _ := providerServer.applicationID.Load().(string); applicationID != "application-1" {
+		t.Fatalf("provider application_id = %q", applicationID)
 	}
 }
 
@@ -67,10 +70,12 @@ func TestClient_ValidateTargetRejectsSSRFAddresses(t *testing.T) {
 
 type fakeProviderServer struct {
 	dictionaryv1.UnimplementedDictionaryProviderServiceServer
-	calls atomic.Int32
+	calls         atomic.Int32
+	applicationID atomic.Value
 }
 
-func (s *fakeProviderServer) Query(context.Context, *dictionaryv1.DictionaryProviderServiceQueryRequest) (*dictionaryv1.DictionaryProviderServiceQueryResponse, error) {
+func (s *fakeProviderServer) Query(_ context.Context, request *dictionaryv1.DictionaryProviderServiceQueryRequest) (*dictionaryv1.DictionaryProviderServiceQueryResponse, error) {
 	s.calls.Add(1)
+	s.applicationID.Store(request.GetQuery().GetApplicationId())
 	return &dictionaryv1.DictionaryProviderServiceQueryResponse{Result: &dictionaryv1.QueryResponse{Items: []*dictionaryv1.DictionaryItem{{Id: "org-1", DictionaryCode: "tenant.organization_units", Code: "engineering", Name: "Engineering", Status: "active"}}, Result: &dictionaryv1.ResultPage{Page: &commonv1.PageResult{Total: 1, Page: 1, PageSize: 20}}}}, nil
 }

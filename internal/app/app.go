@@ -44,6 +44,7 @@ func New(cfg config.Config) *fx.App {
 		fx.Provide(observability.NewMetrics),
 		outbound.Module,
 		fx.Provide(authorization.New),
+		fx.Provide(newApplicationVerifier),
 		scheduler.Module,
 		grpctransport.Module,
 		httptransport.Module,
@@ -125,4 +126,4 @@ var CacheModule = fx.Module("cache", fx.Provide(newRedis, newLocker), fx.Invoke(
 
 func newProviderGateway(client *providerclient.Client) dictionary.ProviderGateway { return client }
 
-var DictionaryModule = fx.Module("dictionary", fx.Provide(dictionary.NewRepository, providerclient.New, newProviderGateway, dictionary.NewService))
+var DictionaryModule = fx.Module("dictionary", fx.Provide(dictionary.NewRepository, providerclient.New, newProviderGateway, dictionary.NewRuntimeService))

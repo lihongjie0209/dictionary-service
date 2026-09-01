@@ -1037,6 +1037,9 @@
                 "name"
             ],
             "properties": {
+                "application_id": {
+                    "type": "string"
+                },
                 "code": {
                     "type": "string"
                 },
@@ -1092,6 +1095,9 @@
         "httptransport.DictionaryView": {
             "type": "object",
             "properties": {
+                "application_id": {
+                    "type": "string"
+                },
                 "code": {
                     "type": "string"
                 },
@@ -1145,6 +1151,9 @@
                 "code"
             ],
             "properties": {
+                "application_id": {
+                    "type": "string"
+                },
                 "code": {
                     "type": "string"
                 },
@@ -1220,6 +1229,9 @@
         "httptransport.ListDictionariesRequest": {
             "type": "object",
             "properties": {
+                "application_id": {
+                    "type": "string"
+                },
                 "keyword": {
                     "type": "string"
                 },
@@ -1412,6 +1424,9 @@
                 "dictionary_code"
             ],
             "properties": {
+                "application_id": {
+                    "type": "string"
+                },
                 "cursor": {
                     "type": "string"
                 },
@@ -1511,6 +1526,9 @@
                 "dictionary_code"
             ],
             "properties": {
+                "application_id": {
+                    "type": "string"
+                },
                 "codes": {
                     "type": "array",
                     "items": {
@@ -1561,6 +1579,9 @@
                 "mode"
             ],
             "properties": {
+                "application_id": {
+                    "type": "string"
+                },
                 "dictionary_code": {
                     "type": "string"
                 },

@@ -19,9 +19,9 @@ var (
 type Repository interface {
 	CreateDictionary(context.Context, sqlx.ExtContext, Dictionary) error
 	UpdateDictionary(context.Context, sqlx.ExtContext, Dictionary, int64) error
-	GetDictionary(context.Context, string, string) (Dictionary, error)
+	GetDictionary(context.Context, string, string, string) (Dictionary, error)
 	GetDictionaryByID(context.Context, string) (Dictionary, error)
-	ListDictionaries(context.Context, string, string, string, int, int) ([]Dictionary, int64, error)
+	ListDictionaries(context.Context, string, string, string, string, int, int) ([]Dictionary, int64, error)
 	GetDraftItem(context.Context, string) (Item, error)
 	UpsertDraftItem(context.Context, sqlx.ExtContext, Item, int64) error
 	DeleteDraftItem(context.Context, sqlx.ExtContext, string, int64, time.Time, string) error
@@ -98,11 +98,11 @@ type SQLRepository struct{ db *sqlx.DB }
 
 func NewRepository(db *sqlx.DB) Repository { return &SQLRepository{db: db} }
 
-const dictionaryColumns = `id,tenant_id,code,name,description,kind,status,provider_id,metadata_json,published_version,version,created_at,updated_at,created_by,updated_by`
+const dictionaryColumns = `id,tenant_id,application_id,code,name,description,kind,status,provider_id,metadata_json,published_version,version,created_at,updated_at,created_by,updated_by`
 const itemColumns = `id,dictionary_id,code,name,parent_id,parent_code,leaf,sort_order,disabled,status,metadata_json,version,created_at,updated_at,created_by,updated_by`
 
 func (r *SQLRepository) CreateDictionary(ctx context.Context, e sqlx.ExtContext, v Dictionary) error {
-	_, err := e.ExecContext(ctx, r.db.Rebind(`INSERT INTO dictionaries (`+dictionaryColumns+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`), v.ID, v.TenantID, v.Code, v.Name, v.Description, v.Kind, v.Status, v.ProviderID, v.MetadataJSON, v.PublishedVersion, v.Version, v.CreatedAt, v.UpdatedAt, v.CreatedBy, v.UpdatedBy)
+	_, err := e.ExecContext(ctx, r.db.Rebind(`INSERT INTO dictionaries (`+dictionaryColumns+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`), v.ID, v.TenantID, v.ApplicationID, v.Code, v.Name, v.Description, v.Kind, v.Status, v.ProviderID, v.MetadataJSON, v.PublishedVersion, v.Version, v.CreatedAt, v.UpdatedAt, v.CreatedBy, v.UpdatedBy)
 	return err
 }
 
@@ -111,9 +111,9 @@ func (r *SQLRepository) UpdateDictionary(ctx context.Context, e sqlx.ExtContext,
 	return stale(result, err)
 }
 
-func (r *SQLRepository) GetDictionary(ctx context.Context, tenantID, code string) (Dictionary, error) {
+func (r *SQLRepository) GetDictionary(ctx context.Context, tenantID, applicationID, code string) (Dictionary, error) {
 	var value Dictionary
-	err := r.db.GetContext(ctx, &value, r.db.Rebind(`SELECT `+dictionaryColumns+` FROM dictionaries WHERE tenant_id=? AND code=?`), tenantID, code)
+	err := r.db.GetContext(ctx, &value, r.db.Rebind(`SELECT `+dictionaryColumns+` FROM dictionaries WHERE tenant_id=? AND application_id=? AND code=?`), tenantID, applicationID, code)
 	return value, notFound(err)
 }
 
@@ -123,9 +123,9 @@ func (r *SQLRepository) GetDictionaryByID(ctx context.Context, id string) (Dicti
 	return value, notFound(err)
 }
 
-func (r *SQLRepository) ListDictionaries(ctx context.Context, tenantID, status, keyword string, limit, offset int) ([]Dictionary, int64, error) {
-	where := `tenant_id=?`
-	args := []any{tenantID}
+func (r *SQLRepository) ListDictionaries(ctx context.Context, tenantID, applicationID, status, keyword string, limit, offset int) ([]Dictionary, int64, error) {
+	where := `tenant_id=? AND application_id=?`
+	args := []any{tenantID, applicationID}
 	if status != "" {
 		where += ` AND status=?`
 		args = append(args, status)

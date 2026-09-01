@@ -18,6 +18,7 @@ import (
 	"github.com/lihongjie0209/dictionary-service/internal/apperror"
 	"github.com/lihongjie0209/dictionary-service/internal/cache"
 	"github.com/lihongjie0209/dictionary-service/internal/database"
+	"github.com/lihongjie0209/microservice-platform-go/appaccess"
 	platformevents "github.com/lihongjie0209/microservice-platform-go/eventbus"
 	"github.com/lihongjie0209/microservice-platform-go/principal"
 	dictionaryv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/dictionary/v1"
@@ -27,19 +28,33 @@ import (
 var codePattern = regexp.MustCompile(`^[a-z][a-z0-9_.-]{1,127}$`)
 
 type Service struct {
-	repository Repository
-	transactor *database.Transactor
-	locker     *cache.Locker
-	gateway    ProviderGateway
-	now        func() time.Time
+	repository   Repository
+	transactor   *database.Transactor
+	locker       *cache.Locker
+	gateway      ProviderGateway
+	applications appaccess.Verifier
+	now          func() time.Time
 }
 
+type allowAllApplications struct{}
+
+func (allowAllApplications) Verify(context.Context, string, string) error { return nil }
+
 func NewService(repository Repository, transactor *database.Transactor, locker *cache.Locker, gateway ProviderGateway) *Service {
-	return &Service{repository: repository, transactor: transactor, locker: locker, gateway: gateway, now: time.Now}
+	return &Service{repository: repository, transactor: transactor, locker: locker, gateway: gateway, applications: allowAllApplications{}, now: time.Now}
+}
+
+func NewRuntimeService(repository Repository, transactor *database.Transactor, locker *cache.Locker, gateway ProviderGateway, applications appaccess.Verifier) (*Service, error) {
+	if applications == nil {
+		return nil, errors.New("application verifier is required")
+	}
+	service := NewService(repository, transactor, locker, gateway)
+	service.applications = applications
+	return service, nil
 }
 
 type DictionaryInput struct {
-	TenantID, Code, Name, Description, Status, MetadataJSON string
+	TenantID, ApplicationID, Code, Name, Description, Status, MetadataJSON string
 }
 
 type ProviderInput struct {
@@ -56,7 +71,7 @@ func (s *Service) Create(ctx context.Context, input DictionaryInput) (Dictionary
 	if err != nil {
 		return Dictionary{}, err
 	}
-	if err := authorizeTenant(ctx, input.TenantID, false); err != nil {
+	if err := s.authorizeScope(ctx, input.TenantID, input.ApplicationID, false); err != nil {
 		return Dictionary{}, err
 	}
 	input, err = validateDictionary(input, true)
@@ -64,7 +79,7 @@ func (s *Service) Create(ctx context.Context, input DictionaryInput) (Dictionary
 		return Dictionary{}, err
 	}
 	now := s.now()
-	value := Dictionary{ID: uuid.NewString(), TenantID: input.TenantID, Code: input.Code, Name: input.Name, Description: input.Description, Kind: KindStatic, Status: StatusDraft, MetadataJSON: defaultJSON(input.MetadataJSON), AuditFields: AuditFields{Version: 1, CreatedAt: now, UpdatedAt: now, CreatedBy: actor, UpdatedBy: actor}}
+	value := Dictionary{ID: uuid.NewString(), TenantID: input.TenantID, ApplicationID: input.ApplicationID, Code: input.Code, Name: input.Name, Description: input.Description, Kind: KindStatic, Status: StatusDraft, MetadataJSON: defaultJSON(input.MetadataJSON), AuditFields: AuditFields{Version: 1, CreatedAt: now, UpdatedAt: now, CreatedBy: actor, UpdatedBy: actor}}
 	err = s.transactor.Within(ctx, nil, func(tx *sqlx.Tx) error { return s.repository.CreateDictionary(ctx, tx, value) })
 	return value, translate(err)
 }
@@ -81,10 +96,10 @@ func (s *Service) Update(ctx context.Context, id string, input DictionaryInput, 
 	if err != nil {
 		return Dictionary{}, translate(err)
 	}
-	if err := authorizeTenant(ctx, current.TenantID, false); err != nil {
+	if err := s.authorizeScope(ctx, current.TenantID, current.ApplicationID, false); err != nil {
 		return Dictionary{}, err
 	}
-	input.TenantID, input.Code = current.TenantID, current.Code
+	input.TenantID, input.ApplicationID, input.Code = current.TenantID, current.ApplicationID, current.Code
 	input, err = validateDictionary(input, false)
 	if err != nil {
 		return Dictionary{}, err
@@ -96,14 +111,17 @@ func (s *Service) Update(ctx context.Context, id string, input DictionaryInput, 
 	return current, translate(err)
 }
 
-func (s *Service) Get(ctx context.Context, tenantID, code string) (Dictionary, error) {
-	tenantID, code = strings.TrimSpace(tenantID), strings.TrimSpace(code)
-	if err := authorizeTenant(ctx, tenantID, true); err != nil {
+func (s *Service) Get(ctx context.Context, tenantID, applicationID, code string) (Dictionary, error) {
+	tenantID, applicationID, code = strings.TrimSpace(tenantID), strings.TrimSpace(applicationID), strings.TrimSpace(code)
+	if err := s.authorizeScope(ctx, tenantID, applicationID, true); err != nil {
 		return Dictionary{}, err
 	}
-	value, err := s.repository.GetDictionary(ctx, tenantID, code)
+	value, err := s.repository.GetDictionary(ctx, tenantID, applicationID, code)
+	if errors.Is(err, ErrNotFound) && applicationID != "" {
+		value, err = s.repository.GetDictionary(ctx, tenantID, "", code)
+	}
 	if errors.Is(err, ErrNotFound) && tenantID != "" {
-		value, err = s.repository.GetDictionary(ctx, "", code)
+		value, err = s.repository.GetDictionary(ctx, "", "", code)
 	}
 	if errors.Is(err, ErrNotFound) {
 		if resolver, ok := s.gateway.(ProviderResolver); ok {
@@ -116,15 +134,15 @@ func (s *Service) Get(ctx context.Context, tenantID, code string) (Dictionary, e
 	return value, translate(err)
 }
 
-func (s *Service) List(ctx context.Context, tenantID, status, keyword string, page, pageSize int) (Page[Dictionary], error) {
-	if err := authorizeTenant(ctx, tenantID, true); err != nil {
+func (s *Service) List(ctx context.Context, tenantID, applicationID, status, keyword string, page, pageSize int) (Page[Dictionary], error) {
+	if err := s.authorizeScope(ctx, tenantID, applicationID, true); err != nil {
 		return Page[Dictionary]{}, err
 	}
 	page, pageSize, err := pagination(page, pageSize)
 	if err != nil {
 		return Page[Dictionary]{}, err
 	}
-	items, total, err := s.repository.ListDictionaries(ctx, strings.TrimSpace(tenantID), strings.TrimSpace(status), strings.TrimSpace(keyword), pageSize, (page-1)*pageSize)
+	items, total, err := s.repository.ListDictionaries(ctx, strings.TrimSpace(tenantID), strings.TrimSpace(applicationID), strings.TrimSpace(status), strings.TrimSpace(keyword), pageSize, (page-1)*pageSize)
 	return Page[Dictionary]{Items: items, Total: total, Page: page, PageSize: pageSize}, translate(err)
 }
 
@@ -137,7 +155,7 @@ func (s *Service) UpsertItems(ctx context.Context, dictionaryID string, items []
 	if err != nil {
 		return nil, translate(err)
 	}
-	if err := authorizeTenant(ctx, dictionary.TenantID, false); err != nil {
+	if err := s.authorizeScope(ctx, dictionary.TenantID, dictionary.ApplicationID, false); err != nil {
 		return nil, err
 	}
 	if dictionary.Kind != KindStatic {
@@ -187,7 +205,7 @@ func (s *Service) ListDraftItems(ctx context.Context, dictionaryID string) ([]It
 	if err != nil {
 		return nil, translate(err)
 	}
-	if err := authorizeTenant(ctx, dictionary.TenantID, false); err != nil {
+	if err := s.authorizeScope(ctx, dictionary.TenantID, dictionary.ApplicationID, false); err != nil {
 		return nil, err
 	}
 	if dictionary.Kind != KindStatic {
@@ -210,7 +228,7 @@ func (s *Service) DeleteItem(ctx context.Context, id string, expected int64) err
 	if err != nil {
 		return translate(err)
 	}
-	if err := authorizeTenant(ctx, dictionary.TenantID, false); err != nil {
+	if err := s.authorizeScope(ctx, dictionary.TenantID, dictionary.ApplicationID, false); err != nil {
 		return err
 	}
 	items, err := s.repository.ListDraftItems(ctx, item.DictionaryID)
@@ -235,7 +253,7 @@ func (s *Service) Publish(ctx context.Context, dictionaryID string, expected int
 	if err != nil {
 		return Release{}, nil, translate(err)
 	}
-	if err := authorizeTenant(ctx, dictionary.TenantID, false); err != nil {
+	if err := s.authorizeScope(ctx, dictionary.TenantID, dictionary.ApplicationID, false); err != nil {
 		return Release{}, nil, err
 	}
 	if s.locker == nil {
@@ -270,13 +288,13 @@ func (s *Service) Publish(ctx context.Context, dictionaryID string, expected int
 		}
 		dictionary.PublishedVersion, dictionary.Status, dictionary.Version = release.ReleaseVersion, StatusActive, expected+1
 		dictionary.UpdatedAt, dictionary.UpdatedBy = now, actor
-		return s.addEvent(ctx, tx, "platform.dictionary.dictionary.published.v1", "platform.dictionary.v1.DictionaryPublished", dictionary.ID, "dictionary", dictionary.TenantID, actor, now, &dictionaryv1.DictionaryPublishedEvent{Dictionary: ToProtoDictionary(dictionary), PublishedVersion: release.ReleaseVersion})
+		return s.addEvent(ctx, tx, "platform.dictionary.dictionary.published.v1", "platform.dictionary.v1.DictionaryPublished", dictionary.ID, "dictionary", dictionary.TenantID, dictionary.ApplicationID, actor, now, &dictionaryv1.DictionaryPublishedEvent{Dictionary: ToProtoDictionary(dictionary), PublishedVersion: release.ReleaseVersion})
 	})
 	return release, items, translate(err)
 }
 
-func (s *Service) Query(ctx context.Context, tenantID, code string, search Search) (Page[Item], error) {
-	dictionary, err := s.Get(ctx, tenantID, code)
+func (s *Service) Query(ctx context.Context, tenantID, applicationID, code string, search Search) (Page[Item], error) {
+	dictionary, err := s.Get(ctx, tenantID, applicationID, code)
 	if err != nil {
 		return Page[Item]{}, err
 	}
@@ -300,7 +318,7 @@ func (s *Service) Query(ctx context.Context, tenantID, code string, search Searc
 		if search.Limit > int(capability.MaxPageSize) {
 			return Page[Item]{}, apperror.Invalid("limit exceeds provider capability", nil)
 		}
-		value, err := s.gateway.Query(ctx, provider, tenantID, code, search)
+		value, err := s.gateway.Query(ctx, provider, tenantID, applicationID, code, search)
 		return Page[Item](value), providerError(err)
 	}
 	if dictionary.PublishedVersion == 0 {
@@ -320,8 +338,8 @@ func (s *Service) Query(ctx context.Context, tenantID, code string, search Searc
 	return Page[Item]{Items: items, Total: total, Page: search.Page, PageSize: search.PageSize}, translate(err)
 }
 
-func (s *Service) Tree(ctx context.Context, tenantID, code, mode, parentID, keyword string, maxDepth, maxNodes int) ([]TreeNode, bool, error) {
-	dictionary, err := s.Get(ctx, tenantID, code)
+func (s *Service) Tree(ctx context.Context, tenantID, applicationID, code, mode, parentID, keyword string, maxDepth, maxNodes int) ([]TreeNode, bool, error) {
+	dictionary, err := s.Get(ctx, tenantID, applicationID, code)
 	if err != nil {
 		return nil, false, err
 	}
@@ -342,7 +360,7 @@ func (s *Service) Tree(ctx context.Context, tenantID, code, mode, parentID, keyw
 		if maxDepth > int(capability.MaxTreeDepth) || maxNodes > int(capability.MaxTreeNodes) {
 			return nil, false, apperror.Invalid("tree limits exceed provider capability", nil)
 		}
-		value, truncated, err := s.gateway.Tree(ctx, provider, tenantID, code, mode, parentID, keyword, maxDepth, maxNodes, nil)
+		value, truncated, err := s.gateway.Tree(ctx, provider, tenantID, applicationID, code, mode, parentID, keyword, maxDepth, maxNodes, nil)
 		return value, truncated, providerError(err)
 	}
 	if dictionary.PublishedVersion == 0 {
@@ -364,11 +382,11 @@ func (s *Service) Tree(ctx context.Context, tenantID, code, mode, parentID, keyw
 	return buildTree(items, mode, parentID, keyword, maxDepth, maxNodes)
 }
 
-func (s *Service) ResolveCodes(ctx context.Context, tenantID, code string, codes []string) (map[string]Item, error) {
+func (s *Service) ResolveCodes(ctx context.Context, tenantID, applicationID, code string, codes []string) (map[string]Item, error) {
 	if len(codes) > 500 {
 		return nil, apperror.Invalid("at most 500 codes can be resolved", nil)
 	}
-	dictionary, err := s.Get(ctx, tenantID, code)
+	dictionary, err := s.Get(ctx, tenantID, applicationID, code)
 	if err != nil {
 		return nil, err
 	}
@@ -377,7 +395,7 @@ func (s *Service) ResolveCodes(ctx context.Context, tenantID, code string, codes
 		if providerErr != nil {
 			return nil, providerErr
 		}
-		value, providerErr := s.gateway.ResolveCodes(ctx, provider, tenantID, code, codes)
+		value, providerErr := s.gateway.ResolveCodes(ctx, provider, tenantID, applicationID, code, codes)
 		return value, providerError(providerErr)
 	}
 	items, err := s.repository.ListPublishedItems(ctx, dictionary.ID, dictionary.PublishedVersion)
@@ -436,7 +454,7 @@ func (s *Service) RegisterProvider(ctx context.Context, input ProviderInput) (Pr
 	expectedVersion := current.Version
 	dictionaryValues := make(map[string]Dictionary, len(input.Capabilities))
 	for _, capability := range input.Capabilities {
-		dictionaryValue, lookupErr := s.repository.GetDictionary(ctx, "", capability.DictionaryCode)
+		dictionaryValue, lookupErr := s.repository.GetDictionary(ctx, "", "", capability.DictionaryCode)
 		if lookupErr != nil && !errors.Is(lookupErr, ErrNotFound) {
 			return Provider{}, "", translate(lookupErr)
 		}
@@ -474,7 +492,7 @@ func (s *Service) RegisterProvider(ctx context.Context, input ProviderInput) (Pr
 		if !create {
 			eventProvider.Version = expectedVersion + 1
 		}
-		return s.addEvent(ctx, tx, "platform.dictionary.provider.changed.v1", "platform.dictionary.v1.ProviderChanged", current.ID, "dictionary_provider", "", actor, now, &dictionaryv1.ProviderChangedEvent{Provider: ToProtoProvider(eventProvider), ChangeType: changeType})
+		return s.addEvent(ctx, tx, "platform.dictionary.provider.changed.v1", "platform.dictionary.v1.ProviderChanged", current.ID, "dictionary_provider", "", "", actor, now, &dictionaryv1.ProviderChangedEvent{Provider: ToProtoProvider(eventProvider), ChangeType: changeType})
 	})
 	if err != nil {
 		return Provider{}, "", translate(err)
@@ -524,7 +542,7 @@ func (s *Service) UnregisterProvider(ctx context.Context, id, token string) erro
 		provider.Status = StatusInactive
 		provider.Version++
 		provider.UpdatedAt, provider.UpdatedBy = now, actor
-		return s.addEvent(ctx, tx, "platform.dictionary.provider.changed.v1", "platform.dictionary.v1.ProviderChanged", provider.ID, "dictionary_provider", "", actor, now, &dictionaryv1.ProviderChangedEvent{Provider: ToProtoProvider(provider), ChangeType: "unregistered"})
+		return s.addEvent(ctx, tx, "platform.dictionary.provider.changed.v1", "platform.dictionary.v1.ProviderChanged", provider.ID, "dictionary_provider", "", "", actor, now, &dictionaryv1.ProviderChangedEvent{Provider: ToProtoProvider(provider), ChangeType: "unregistered"})
 	})
 	if errors.Is(err, ErrStaleVersion) {
 		return apperror.Unauthorized("invalid provider lease token")
@@ -678,8 +696,8 @@ func providerError(err error) error {
 	return apperror.Unavailable("dynamic dictionary provider call failed", err)
 }
 
-func (s *Service) addEvent(ctx context.Context, tx *sqlx.Tx, subject, eventType, aggregateID, aggregateType, tenantID, actor string, at time.Time, payload proto.Message) error {
-	envelope, err := platformevents.NewEnvelope(platformevents.Metadata{EventID: uuid.NewString(), EventType: eventType, AggregateID: aggregateID, AggregateType: aggregateType, TenantID: tenantID, SchemaVersion: 1, ActorID: actor, OccurredAt: at}, payload)
+func (s *Service) addEvent(ctx context.Context, tx *sqlx.Tx, subject, eventType, aggregateID, aggregateType, tenantID, applicationID, actor string, at time.Time, payload proto.Message) error {
+	envelope, err := platformevents.NewEnvelope(platformevents.Metadata{EventID: uuid.NewString(), EventType: eventType, AggregateID: aggregateID, AggregateType: aggregateType, TenantID: tenantID, ApplicationID: applicationID, SchemaVersion: 1, ActorID: actor, OccurredAt: at}, payload)
 	if err != nil {
 		return err
 	}
@@ -691,9 +709,10 @@ func (s *Service) addEvent(ctx context.Context, tx *sqlx.Tx, subject, eventType,
 }
 
 func validateDictionary(input DictionaryInput, creating bool) (DictionaryInput, error) {
-	input.TenantID, input.Code, input.Name = strings.TrimSpace(input.TenantID), strings.TrimSpace(input.Code), strings.TrimSpace(input.Name)
+	input.TenantID, input.ApplicationID = strings.TrimSpace(input.TenantID), strings.TrimSpace(input.ApplicationID)
+	input.Code, input.Name = strings.TrimSpace(input.Code), strings.TrimSpace(input.Name)
 	input.Description, input.Status, input.MetadataJSON = strings.TrimSpace(input.Description), strings.TrimSpace(input.Status), defaultJSON(input.MetadataJSON)
-	if !codePattern.MatchString(input.Code) || input.Name == "" || !json.Valid([]byte(input.MetadataJSON)) {
+	if (input.TenantID == "" && input.ApplicationID != "") || !codePattern.MatchString(input.Code) || input.Name == "" || !json.Valid([]byte(input.MetadataJSON)) {
 		return input, apperror.Invalid("dictionary code, name, or metadata is invalid", nil)
 	}
 	if !creating && input.Status != StatusDraft && input.Status != StatusActive && input.Status != "disabled" {
@@ -829,24 +848,39 @@ func actor(ctx context.Context) (string, error) {
 	return value.ID, nil
 }
 
-func authorizeTenant(ctx context.Context, tenantID string, allowGlobal bool) error {
+func (s *Service) authorizeScope(ctx context.Context, tenantID, applicationID string, allowGlobal bool) error {
 	identity, ok := principal.FromContext(ctx)
 	if !ok {
 		return apperror.Unauthorized("authenticated actor is required")
 	}
+	tenantID, applicationID = strings.TrimSpace(tenantID), strings.TrimSpace(applicationID)
+	if tenantID == "" && applicationID != "" {
+		return apperror.Invalid("application_id requires tenant_id", nil)
+	}
 	switch identity.Type {
 	case principal.TypeServiceAccount, principal.TypeSystem:
-		return nil
+		// Machine callers still need a valid application grant for application-owned dictionaries.
 	case principal.TypeUser:
-		requested := strings.TrimSpace(tenantID)
-		if allowGlobal && requested == "" {
+		if allowGlobal && tenantID == "" {
 			return nil
 		}
-		if identity.TenantID != "" && identity.TenantID == requested {
-			return nil
+		if identity.TenantID == "" || identity.TenantID != tenantID {
+			return apperror.Forbidden("tenant access denied")
 		}
+	default:
+		return apperror.Forbidden("tenant access denied")
 	}
-	return apperror.Forbidden("tenant access denied")
+	if applicationID == "" {
+		return nil
+	}
+	err := s.applications.Verify(ctx, tenantID, applicationID)
+	if errors.Is(err, appaccess.ErrNotGranted) {
+		return apperror.Forbidden("tenant application access denied")
+	}
+	if err != nil {
+		return apperror.Unavailable("verify tenant application access", err)
+	}
+	return nil
 }
 func translate(err error) error {
 	if err == nil {

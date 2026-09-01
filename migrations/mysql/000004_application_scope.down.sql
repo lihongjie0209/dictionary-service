@@ -1,0 +1,1 @@
+ALTER TABLE dictionaries DROP INDEX idx_dictionaries_list, ADD INDEX idx_dictionaries_list (tenant_id, status, code), DROP INDEX uq_dictionary_scope_code, ADD UNIQUE KEY uq_dictionary_tenant_code (tenant_id, code), DROP CHECK chk_dictionaries_scope, DROP COLUMN application_id;

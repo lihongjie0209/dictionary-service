@@ -13,6 +13,7 @@ import (
 type DictionaryView struct {
 	ID               string          `json:"id"`
 	TenantID         string          `json:"tenant_id"`
+	ApplicationID    string          `json:"application_id"`
 	Code             string          `json:"code"`
 	Name             string          `json:"name"`
 	Description      string          `json:"description"`
@@ -46,11 +47,12 @@ type ItemView struct {
 	UpdatedBy      string          `json:"updated_by"`
 }
 type CreateDictionaryRequest struct {
-	TenantID     string          `json:"tenant_id"`
-	Code         string          `json:"code" binding:"required"`
-	Name         string          `json:"name" binding:"required"`
-	Description  string          `json:"description"`
-	MetadataJSON json.RawMessage `json:"metadata_json" swaggertype:"object"`
+	TenantID      string          `json:"tenant_id"`
+	ApplicationID string          `json:"application_id"`
+	Code          string          `json:"code" binding:"required"`
+	Name          string          `json:"name" binding:"required"`
+	Description   string          `json:"description"`
+	MetadataJSON  json.RawMessage `json:"metadata_json" swaggertype:"object"`
 }
 type UpdateDictionaryRequest struct {
 	ID           string          `json:"id" binding:"required"`
@@ -61,15 +63,17 @@ type UpdateDictionaryRequest struct {
 	Version      int64           `json:"version" binding:"required"`
 }
 type GetDictionaryRequest struct {
-	TenantID string `json:"tenant_id"`
-	Code     string `json:"code" binding:"required"`
+	TenantID      string `json:"tenant_id"`
+	ApplicationID string `json:"application_id"`
+	Code          string `json:"code" binding:"required"`
 }
 type ListDictionariesRequest struct {
-	TenantID string `json:"tenant_id"`
-	Status   string `json:"status"`
-	Keyword  string `json:"keyword"`
-	Page     int    `json:"page"`
-	PageSize int    `json:"page_size"`
+	TenantID      string `json:"tenant_id"`
+	ApplicationID string `json:"application_id"`
+	Status        string `json:"status"`
+	Keyword       string `json:"keyword"`
+	Page          int    `json:"page"`
+	PageSize      int    `json:"page_size"`
 }
 type UpsertItemsRequest struct {
 	DictionaryID string     `json:"dictionary_id" binding:"required"`
@@ -89,6 +93,7 @@ type PublishDictionaryRequest struct {
 }
 type QueryDictionaryRequest struct {
 	TenantID       string            `json:"tenant_id"`
+	ApplicationID  string            `json:"application_id"`
 	DictionaryCode string            `json:"dictionary_code" binding:"required"`
 	Keyword        string            `json:"keyword"`
 	Sort           string            `json:"sort"`
@@ -101,6 +106,7 @@ type QueryDictionaryRequest struct {
 }
 type TreeDictionaryRequest struct {
 	TenantID       string `json:"tenant_id"`
+	ApplicationID  string `json:"application_id"`
 	DictionaryCode string `json:"dictionary_code" binding:"required"`
 	Mode           string `json:"mode" binding:"required"`
 	ParentID       string `json:"parent_id"`
@@ -110,6 +116,7 @@ type TreeDictionaryRequest struct {
 }
 type ResolveCodesRequest struct {
 	TenantID       string   `json:"tenant_id"`
+	ApplicationID  string   `json:"application_id"`
 	DictionaryCode string   `json:"dictionary_code" binding:"required"`
 	Codes          []string `json:"codes" binding:"required"`
 }
@@ -221,7 +228,7 @@ func (h *Handler) CreateDictionary(c *gin.Context) {
 	if !bind(c, h.logger, &request) {
 		return
 	}
-	value, err := h.dictionaries.Create(c.Request.Context(), dictionary.DictionaryInput{TenantID: request.TenantID, Code: request.Code, Name: request.Name, Description: request.Description, MetadataJSON: string(rawJSON(request.MetadataJSON, false))})
+	value, err := h.dictionaries.Create(c.Request.Context(), dictionary.DictionaryInput{TenantID: request.TenantID, ApplicationID: request.ApplicationID, Code: request.Code, Name: request.Name, Description: request.Description, MetadataJSON: string(rawJSON(request.MetadataJSON, false))})
 	respond(c, h.logger, dictionaryView(value), err)
 }
 
@@ -259,7 +266,7 @@ func (h *Handler) GetDictionary(c *gin.Context) {
 	if !bind(c, h.logger, &request) {
 		return
 	}
-	value, err := h.dictionaries.Get(c.Request.Context(), request.TenantID, request.Code)
+	value, err := h.dictionaries.Get(c.Request.Context(), request.TenantID, request.ApplicationID, request.Code)
 	respond(c, h.logger, dictionaryView(value), err)
 }
 
@@ -277,7 +284,7 @@ func (h *Handler) ListDictionaries(c *gin.Context) {
 	if !bind(c, h.logger, &request) {
 		return
 	}
-	value, err := h.dictionaries.List(c.Request.Context(), request.TenantID, request.Status, request.Keyword, request.Page, request.PageSize)
+	value, err := h.dictionaries.List(c.Request.Context(), request.TenantID, request.ApplicationID, request.Status, request.Keyword, request.Page, request.PageSize)
 	items := make([]DictionaryView, 0, len(value.Items))
 	for _, item := range value.Items {
 		items = append(items, dictionaryView(item))
@@ -378,7 +385,7 @@ func (h *Handler) QueryDictionary(c *gin.Context) {
 	if !bind(c, h.logger, &request) {
 		return
 	}
-	value, err := h.dictionaries.Query(c.Request.Context(), request.TenantID, request.DictionaryCode, dictionary.Search{Keyword: request.Keyword, Filters: request.Filters, Sort: request.Sort, Descending: request.Descending, Page: request.Page, PageSize: request.PageSize, Cursor: request.Cursor, Limit: request.Limit})
+	value, err := h.dictionaries.Query(c.Request.Context(), request.TenantID, request.ApplicationID, request.DictionaryCode, dictionary.Search{Keyword: request.Keyword, Filters: request.Filters, Sort: request.Sort, Descending: request.Descending, Page: request.Page, PageSize: request.PageSize, Cursor: request.Cursor, Limit: request.Limit})
 	respond(c, h.logger, gin.H{"items": itemViews(value.Items), "total": value.Total, "page": value.Page, "page_size": value.PageSize, "next_cursor": value.NextCursor, "has_more": value.HasMore}, err)
 }
 
@@ -396,7 +403,7 @@ func (h *Handler) TreeDictionary(c *gin.Context) {
 	if !bind(c, h.logger, &request) {
 		return
 	}
-	value, truncated, err := h.dictionaries.Tree(c.Request.Context(), request.TenantID, request.DictionaryCode, request.Mode, request.ParentID, request.Keyword, request.MaxDepth, request.MaxNodes)
+	value, truncated, err := h.dictionaries.Tree(c.Request.Context(), request.TenantID, request.ApplicationID, request.DictionaryCode, request.Mode, request.ParentID, request.Keyword, request.MaxDepth, request.MaxNodes)
 	respond(c, h.logger, gin.H{"roots": treeViews(value), "truncated": truncated}, err)
 }
 
@@ -414,7 +421,7 @@ func (h *Handler) ResolveCodes(c *gin.Context) {
 	if !bind(c, h.logger, &request) {
 		return
 	}
-	values, err := h.dictionaries.ResolveCodes(c.Request.Context(), request.TenantID, request.DictionaryCode, request.Codes)
+	values, err := h.dictionaries.ResolveCodes(c.Request.Context(), request.TenantID, request.ApplicationID, request.DictionaryCode, request.Codes)
 	result := make([]gin.H, 0, len(request.Codes))
 	for _, code := range request.Codes {
 		item, found := values[code]
@@ -503,7 +510,7 @@ func (h *Handler) ListProviders(c *gin.Context) {
 }
 
 func dictionaryView(value dictionary.Dictionary) DictionaryView {
-	return DictionaryView{ID: value.ID, TenantID: value.TenantID, Code: value.Code, Name: value.Name, Description: value.Description, Kind: value.Kind, Status: value.Status, ProviderID: value.ProviderID, MetadataJSON: rawJSON(json.RawMessage(value.MetadataJSON), false), PublishedVersion: value.PublishedVersion, Version: value.Version, CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt, CreatedBy: value.CreatedBy, UpdatedBy: value.UpdatedBy}
+	return DictionaryView{ID: value.ID, TenantID: value.TenantID, ApplicationID: value.ApplicationID, Code: value.Code, Name: value.Name, Description: value.Description, Kind: value.Kind, Status: value.Status, ProviderID: value.ProviderID, MetadataJSON: rawJSON(json.RawMessage(value.MetadataJSON), false), PublishedVersion: value.PublishedVersion, Version: value.Version, CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt, CreatedBy: value.CreatedBy, UpdatedBy: value.UpdatedBy}
 }
 func itemView(value dictionary.Item) ItemView {
 	return ItemView{ID: value.ID, DictionaryCode: value.DictionaryCode, Code: value.Code, Name: value.Name, ParentID: value.ParentID, ParentCode: value.ParentCode, Leaf: value.Leaf, SortOrder: value.SortOrder, Disabled: value.Disabled, Status: value.Status, MetadataJSON: rawJSON(json.RawMessage(value.MetadataJSON), false), Version: value.Version, CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt, CreatedBy: value.CreatedBy, UpdatedBy: value.UpdatedBy}
