@@ -29,11 +29,19 @@ func TestDictionaryHTTPRequirementCoversEveryBusinessRoute(t *testing.T) {
 		"/api/v1/dictionaries/create", "/api/v1/dictionaries/update", "/api/v1/dictionaries/get", "/api/v1/dictionaries/list",
 		"/api/v1/dictionaries/items/upsert", "/api/v1/dictionaries/items/list", "/api/v1/dictionaries/items/delete",
 		"/api/v1/dictionaries/publish", "/api/v1/dictionaries/query", "/api/v1/dictionaries/tree", "/api/v1/dictionaries/resolve",
-		"/api/v1/dictionaries/providers/register", "/api/v1/dictionaries/providers/heartbeat", "/api/v1/dictionaries/providers/unregister", "/api/v1/dictionaries/providers/list",
+		"/api/v1/dictionaries/providers/list",
 	}
 	for _, route := range routes {
-		if requirement, ok := dictionaryHTTPRequirement(route); !ok || requirement.Resource == "" || requirement.Action == "" {
+		if requirement, ok := dictionaryHTTPRequirement(route); !ok || requirement.Resource == "" || requirement.Action == "" || (requirement.Scope != platformauthz.ScopePrincipal && requirement.Scope != platformauthz.ScopePlatform) {
 			t.Fatalf("route %q requirement = %+v, %v", route, requirement, ok)
+		}
+	}
+	if requirement, ok := dictionaryHTTPRequirement("/api/v1/dictionaries/providers/list"); !ok || requirement.Scope != platformauthz.ScopePlatform {
+		t.Fatalf("provider list requirement = %+v, %v", requirement, ok)
+	}
+	for _, route := range []string{"/api/v1/dictionaries/providers/register", "/api/v1/dictionaries/providers/heartbeat", "/api/v1/dictionaries/providers/unregister"} {
+		if _, ok := dictionaryHTTPRequirement(route); ok {
+			t.Fatalf("PSK provider lifecycle route %q must not require a user RBAC decision", route)
 		}
 	}
 	if _, ok := dictionaryHTTPRequirement("/api/v1/version"); ok {
@@ -95,7 +103,7 @@ func TestAuthentication_PSKPrecedesSkipAndJWT(t *testing.T) {
 	t.Parallel()
 	gin.SetMode(gin.TestMode)
 	const key = "01234567890123456789012345678901"
-	service := auth.New(config.Config{JWT: config.JWT{Issuer: "test", Secret: key, TTL: time.Hour}})
+	service := auth.New(config.Config{JWT: config.JWT{Issuer: "test", Secret: key, TTL: time.Hour}, Auth: config.Auth{ClientID: "client", ClientSecret: "secret"}})
 	for _, test := range []struct {
 		name   string
 		header string
@@ -128,6 +136,27 @@ func TestAuthentication_PSKPrecedesSkipAndJWT(t *testing.T) {
 				t.Fatalf("status = %d, want %d", recorder.Code, test.status)
 			}
 		})
+	}
+}
+
+func TestAuthentication_ProviderLifecycleCannotFallBackToJWT(t *testing.T) {
+	t.Parallel()
+	gin.SetMode(gin.TestMode)
+	const key = "01234567890123456789012345678901"
+	service := auth.New(config.Config{JWT: config.JWT{Issuer: "test", Secret: key, TTL: time.Hour}, Auth: config.Auth{ClientID: "client", ClientSecret: "secret"}})
+	token, err := service.Issue("user-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	router := gin.New()
+	router.Use(Authentication(service, slog.New(slog.NewTextHandler(io.Discard, nil)), config.Auth{}))
+	router.POST("/api/v1/dictionaries/providers/register", func(c *gin.Context) { OK(c, nil) })
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/dictionaries/providers/register", nil)
+	request.Header.Set("Authorization", "Bearer "+token)
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusUnauthorized)
 	}
 }
 

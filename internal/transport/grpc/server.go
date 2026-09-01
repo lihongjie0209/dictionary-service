@@ -74,17 +74,17 @@ func dictionaryGRPCRequirement(enabled bool) platformauthz.GRPCResolver {
 			return platformauthz.Requirement{}, false
 		}
 		requirements := map[string]platformauthz.Requirement{
-			dictionaryv1.DictionaryService_CreateDictionary_FullMethodName:  {Resource: "dictionary.definition", Action: "create"},
-			dictionaryv1.DictionaryService_UpdateDictionary_FullMethodName:  {Resource: "dictionary.definition", Action: "update"},
-			dictionaryv1.DictionaryService_GetDictionary_FullMethodName:     {Resource: "dictionary.definition", Action: "read"},
-			dictionaryv1.DictionaryService_ListDictionaries_FullMethodName:  {Resource: "dictionary.definition", Action: "list"},
-			dictionaryv1.DictionaryService_UpsertItems_FullMethodName:       {Resource: "dictionary.item", Action: "update"},
-			dictionaryv1.DictionaryService_DeleteItem_FullMethodName:        {Resource: "dictionary.item", Action: "delete"},
-			dictionaryv1.DictionaryService_PublishDictionary_FullMethodName: {Resource: "dictionary.definition", Action: "publish"},
-			dictionaryv1.DictionaryService_Query_FullMethodName:             {Resource: "dictionary.data", Action: "query"},
-			dictionaryv1.DictionaryService_Tree_FullMethodName:              {Resource: "dictionary.data", Action: "tree"},
-			dictionaryv1.DictionaryService_ResolveCodes_FullMethodName:      {Resource: "dictionary.data", Action: "resolve"},
-			dictionaryv1.DictionaryService_ListProviders_FullMethodName:     {Resource: "dictionary.provider", Action: "list"},
+			dictionaryv1.DictionaryService_CreateDictionary_FullMethodName:  {Resource: "dictionary.definition", Action: "create", Scope: platformauthz.ScopePrincipal},
+			dictionaryv1.DictionaryService_UpdateDictionary_FullMethodName:  {Resource: "dictionary.definition", Action: "update", Scope: platformauthz.ScopePrincipal},
+			dictionaryv1.DictionaryService_GetDictionary_FullMethodName:     {Resource: "dictionary.definition", Action: "read", Scope: platformauthz.ScopePrincipal},
+			dictionaryv1.DictionaryService_ListDictionaries_FullMethodName:  {Resource: "dictionary.definition", Action: "list", Scope: platformauthz.ScopePrincipal},
+			dictionaryv1.DictionaryService_UpsertItems_FullMethodName:       {Resource: "dictionary.item", Action: "update", Scope: platformauthz.ScopePrincipal},
+			dictionaryv1.DictionaryService_DeleteItem_FullMethodName:        {Resource: "dictionary.item", Action: "delete", Scope: platformauthz.ScopePrincipal},
+			dictionaryv1.DictionaryService_PublishDictionary_FullMethodName: {Resource: "dictionary.definition", Action: "publish", Scope: platformauthz.ScopePrincipal},
+			dictionaryv1.DictionaryService_Query_FullMethodName:             {Resource: "dictionary.data", Action: "query", Scope: platformauthz.ScopePrincipal},
+			dictionaryv1.DictionaryService_Tree_FullMethodName:              {Resource: "dictionary.data", Action: "tree", Scope: platformauthz.ScopePrincipal},
+			dictionaryv1.DictionaryService_ResolveCodes_FullMethodName:      {Resource: "dictionary.data", Action: "resolve", Scope: platformauthz.ScopePrincipal},
+			dictionaryv1.DictionaryService_ListProviders_FullMethodName:     {Resource: "dictionary.provider", Action: "list", Scope: platformauthz.ScopePlatform},
 		}
 		requirement, ok := requirements[method]
 		return requirement, ok
@@ -209,7 +209,12 @@ func authInterceptor(service *auth.Service, cfg config.Auth) grpc.UnaryServerInt
 
 func authenticateGRPC(ctx context.Context, method string, service *auth.Service, cfg config.Auth) (context.Context, error) {
 	values := metadata.ValueFromIncomingContext(ctx, "authorization")
-	if cfg.PSK.Enabled && auth.MatchesAny(method, cfg.PSK.GRPCMethods) {
+	requiresPSK := isProviderLifecycleGRPCMethod(method)
+	usesPSK := cfg.PSK.Enabled && auth.MatchesAny(method, cfg.PSK.GRPCMethods)
+	if requiresPSK && !usesPSK {
+		return nil, status.Error(codes.Unauthenticated, "provider lifecycle method requires configured PSK authentication")
+	}
+	if usesPSK {
 		if len(values) == 0 || !auth.VerifyPSK(values[0], cfg.PSK.Key) {
 			return nil, status.Error(codes.Unauthenticated, "missing or invalid PSK")
 		}
@@ -230,6 +235,17 @@ func authenticateGRPC(ctx context.Context, method string, service *auth.Service,
 		return nil, status.Error(codes.Unauthenticated, "invalid or expired token")
 	}
 	return principal.WithContext(ctx, identity), nil
+}
+
+func isProviderLifecycleGRPCMethod(method string) bool {
+	switch method {
+	case dictionaryv1.DictionaryService_RegisterProvider_FullMethodName,
+		dictionaryv1.DictionaryService_HeartbeatProvider_FullMethodName,
+		dictionaryv1.DictionaryService_UnregisterProvider_FullMethodName:
+		return true
+	default:
+		return false
+	}
 }
 
 type contextServerStream struct {

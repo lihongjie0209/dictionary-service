@@ -248,21 +248,18 @@ func Authorization(enabled bool, authorizer platformauthz.Authorizer, logger *sl
 
 func dictionaryHTTPRequirement(route string) (platformauthz.Requirement, bool) {
 	requirements := map[string]platformauthz.Requirement{
-		"/api/v1/dictionaries/create":               {Resource: "dictionary.definition", Action: "create"},
-		"/api/v1/dictionaries/update":               {Resource: "dictionary.definition", Action: "update"},
-		"/api/v1/dictionaries/get":                  {Resource: "dictionary.definition", Action: "read"},
-		"/api/v1/dictionaries/list":                 {Resource: "dictionary.definition", Action: "list"},
-		"/api/v1/dictionaries/items/upsert":         {Resource: "dictionary.item", Action: "update"},
-		"/api/v1/dictionaries/items/list":           {Resource: "dictionary.item", Action: "list"},
-		"/api/v1/dictionaries/items/delete":         {Resource: "dictionary.item", Action: "delete"},
-		"/api/v1/dictionaries/publish":              {Resource: "dictionary.definition", Action: "publish"},
-		"/api/v1/dictionaries/query":                {Resource: "dictionary.data", Action: "query"},
-		"/api/v1/dictionaries/tree":                 {Resource: "dictionary.data", Action: "tree"},
-		"/api/v1/dictionaries/resolve":              {Resource: "dictionary.data", Action: "resolve"},
-		"/api/v1/dictionaries/providers/register":   {Resource: "dictionary.provider", Action: "register"},
-		"/api/v1/dictionaries/providers/heartbeat":  {Resource: "dictionary.provider", Action: "heartbeat"},
-		"/api/v1/dictionaries/providers/unregister": {Resource: "dictionary.provider", Action: "unregister"},
-		"/api/v1/dictionaries/providers/list":       {Resource: "dictionary.provider", Action: "list"},
+		"/api/v1/dictionaries/create":         {Resource: "dictionary.definition", Action: "create", Scope: platformauthz.ScopePrincipal},
+		"/api/v1/dictionaries/update":         {Resource: "dictionary.definition", Action: "update", Scope: platformauthz.ScopePrincipal},
+		"/api/v1/dictionaries/get":            {Resource: "dictionary.definition", Action: "read", Scope: platformauthz.ScopePrincipal},
+		"/api/v1/dictionaries/list":           {Resource: "dictionary.definition", Action: "list", Scope: platformauthz.ScopePrincipal},
+		"/api/v1/dictionaries/items/upsert":   {Resource: "dictionary.item", Action: "update", Scope: platformauthz.ScopePrincipal},
+		"/api/v1/dictionaries/items/list":     {Resource: "dictionary.item", Action: "list", Scope: platformauthz.ScopePrincipal},
+		"/api/v1/dictionaries/items/delete":   {Resource: "dictionary.item", Action: "delete", Scope: platformauthz.ScopePrincipal},
+		"/api/v1/dictionaries/publish":        {Resource: "dictionary.definition", Action: "publish", Scope: platformauthz.ScopePrincipal},
+		"/api/v1/dictionaries/query":          {Resource: "dictionary.data", Action: "query", Scope: platformauthz.ScopePrincipal},
+		"/api/v1/dictionaries/tree":           {Resource: "dictionary.data", Action: "tree", Scope: platformauthz.ScopePrincipal},
+		"/api/v1/dictionaries/resolve":        {Resource: "dictionary.data", Action: "resolve", Scope: platformauthz.ScopePrincipal},
+		"/api/v1/dictionaries/providers/list": {Resource: "dictionary.provider", Action: "list", Scope: platformauthz.ScopePlatform},
 	}
 	requirement, ok := requirements[route]
 	return requirement, ok
@@ -271,7 +268,13 @@ func dictionaryHTTPRequirement(route string) (platformauthz.Requirement, bool) {
 func Authentication(service *auth.Service, logger *slog.Logger, cfg config.Auth) gin.HandlerFunc {
 	authenticate := JWT(service, logger)
 	return func(c *gin.Context) {
-		if cfg.PSK.Enabled && auth.MatchesAny(c.FullPath(), cfg.PSK.HTTPPaths) {
+		requiresPSK := isProviderLifecycleHTTPRoute(c.FullPath())
+		usesPSK := cfg.PSK.Enabled && auth.MatchesAny(c.FullPath(), cfg.PSK.HTTPPaths)
+		if requiresPSK && !usesPSK {
+			Fail(c, logger, apperror.Unauthorized("provider lifecycle route requires configured PSK authentication"))
+			return
+		}
+		if usesPSK {
 			if !auth.VerifyPSK(c.GetHeader("Authorization"), cfg.PSK.Key) {
 				Fail(c, logger, apperror.Unauthorized("missing or invalid PSK"))
 				return
@@ -286,6 +289,15 @@ func Authentication(service *auth.Service, logger *slog.Logger, cfg config.Auth)
 			return
 		}
 		authenticate(c)
+	}
+}
+
+func isProviderLifecycleHTTPRoute(route string) bool {
+	switch route {
+	case "/api/v1/dictionaries/providers/register", "/api/v1/dictionaries/providers/heartbeat", "/api/v1/dictionaries/providers/unregister":
+		return true
+	default:
+		return false
 	}
 }
 

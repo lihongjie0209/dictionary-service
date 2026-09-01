@@ -9,6 +9,7 @@ import (
 	"github.com/lihongjie0209/dictionary-service/internal/auth"
 	"github.com/lihongjie0209/dictionary-service/internal/config"
 	"github.com/lihongjie0209/dictionary-service/internal/requestid"
+	platformauthz "github.com/lihongjie0209/microservice-platform-go/authz"
 	"github.com/lihongjie0209/microservice-platform-go/principal"
 	dictionaryv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/dictionary/v1"
 	"google.golang.org/grpc"
@@ -32,9 +33,12 @@ func TestDictionaryGRPCRequirementCoversEveryProtectedBusinessMethod(t *testing.
 		dictionaryv1.DictionaryService_ListProviders_FullMethodName,
 	}
 	for _, method := range methods {
-		if requirement, ok := resolve(method); !ok || requirement.Resource == "" || requirement.Action == "" {
+		if requirement, ok := resolve(method); !ok || requirement.Resource == "" || requirement.Action == "" || (requirement.Scope != platformauthz.ScopePrincipal && requirement.Scope != platformauthz.ScopePlatform) {
 			t.Fatalf("method %q requirement = %+v, %v", method, requirement, ok)
 		}
+	}
+	if requirement, ok := resolve(dictionaryv1.DictionaryService_ListProviders_FullMethodName); !ok || requirement.Scope != platformauthz.ScopePlatform {
+		t.Fatalf("provider list requirement = %+v, %v", requirement, ok)
 	}
 	for _, method := range []string{
 		dictionaryv1.DictionaryService_RegisterProvider_FullMethodName,
@@ -120,6 +124,21 @@ func TestAuthenticateGRPC_PSKWildcard(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestAuthenticateGRPC_ProviderLifecycleCannotFallBackToJWT(t *testing.T) {
+	t.Parallel()
+	const key = "01234567890123456789012345678901"
+	service := auth.New(config.Config{JWT: config.JWT{Issuer: "test", Secret: key, TTL: time.Hour}, Auth: config.Auth{ClientID: "client", ClientSecret: "secret"}})
+	token, err := service.Issue("user-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs("authorization", "Bearer "+token))
+	_, err = authenticateGRPC(ctx, dictionaryv1.DictionaryService_RegisterProvider_FullMethodName, service, config.Auth{})
+	if status.Code(err) != codes.Unauthenticated {
+		t.Fatalf("status code = %s, want %s", status.Code(err), codes.Unauthenticated)
 	}
 }
 

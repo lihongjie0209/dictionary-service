@@ -33,6 +33,8 @@
 
 完整请求/响应模型、JWT/PSK 说明和错误码见生成的 [OpenAPI 文档](docs/swagger.yaml)。
 
+Provider 注册、心跳和注销是服务控制面操作，只接受配置的 PSK/mTLS 身份，不叠加租户成员 RBAC；Provider 目录是平台全局资源，其 HTTP/gRPC 列表接口统一在 `__platform__` 范围授权。字典定义与数据查询按当前已认证主体显式选择平台或租户决策范围。
+
 ## 配置与运行
 
 配置按 `config.yaml` → `config-{environment}.yaml` → `APP_*` 环境变量覆盖，`APP_ENV` 或 `-env` 选择环境。开发、测试和生产配置不保存真实密钥。
