@@ -33,6 +33,22 @@ rate_limit:
   enabled: true
 idempotency:
   enabled: true
+  http_paths:
+    - /api/v1/dictionaries/create
+    - /api/v1/dictionaries/update
+    - /api/v1/dictionaries/items/upsert
+    - /api/v1/dictionaries/items/delete
+    - /api/v1/dictionaries/publish
+    - /api/v1/dictionaries/providers/register
+    - /api/v1/dictionaries/providers/unregister
+  grpc_methods:
+    - /platform.dictionary.v1.DictionaryService/CreateDictionary
+    - /platform.dictionary.v1.DictionaryService/UpdateDictionary
+    - /platform.dictionary.v1.DictionaryService/UpsertItems
+    - /platform.dictionary.v1.DictionaryService/DeleteItem
+    - /platform.dictionary.v1.DictionaryService/PublishDictionary
+    - /platform.dictionary.v1.DictionaryService/RegisterProvider
+    - /platform.dictionary.v1.DictionaryService/UnregisterProvider
 observability:
   metrics_enabled: true
   tracing_enabled: false

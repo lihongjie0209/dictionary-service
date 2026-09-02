@@ -7,15 +7,99 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lihongjie0209/dictionary-service/internal/auth"
 	"github.com/lihongjie0209/dictionary-service/internal/config"
+	"github.com/lihongjie0209/dictionary-service/internal/idempotency"
 	platformauthz "github.com/lihongjie0209/microservice-platform-go/authz"
 	"github.com/lihongjie0209/microservice-platform-go/principal"
 )
+
+type fakeIdempotencyManager struct {
+	decision  idempotency.Decision
+	beginKey  string
+	completed *Response
+}
+
+func (*fakeIdempotencyManager) Enabled() bool { return true }
+func (m *fakeIdempotencyManager) Begin(_ context.Context, key, _ string) (idempotency.Decision, error) {
+	m.beginKey = key
+	return m.decision, nil
+}
+func (m *fakeIdempotencyManager) Complete(_ context.Context, _, _ string, response any) error {
+	value, ok := response.(Response)
+	if ok {
+		m.completed = &value
+	}
+	return nil
+}
+func (*fakeIdempotencyManager) Fail(context.Context, string, string, idempotency.Failure) error {
+	return nil
+}
+
+func TestIdempotencyExecutionCompletesAndReplaysDictionaryPublish(t *testing.T) {
+	t.Parallel()
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	manager := &fakeIdempotencyManager{decision: idempotency.Decision{State: idempotency.StateAcquired, Owner: "owner-1"}}
+	calls := 0
+	router := gin.New()
+	router.Use(RequestID(), func(c *gin.Context) {
+		c.Set("subject", "administrator-1")
+		c.Request = c.Request.WithContext(idempotency.WithContext(c.Request.Context(), "operation-1"))
+		c.Next()
+	}, IdempotencyExecution(manager, []string{"/api/v1/dictionaries/publish"}, logger))
+	router.POST("/api/v1/dictionaries/publish", func(c *gin.Context) { calls++; OK(c, gin.H{"version": 2}) })
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/v1/dictionaries/publish", strings.NewReader(`{"dictionary_id":"dictionary-1"}`)))
+	if calls != 1 || manager.beginKey != "operation-1" || manager.completed == nil || manager.completed.RequestID != "" {
+		t.Fatalf("calls=%d key=%q completed=%+v", calls, manager.beginKey, manager.completed)
+	}
+	stored, err := json.Marshal(*manager.completed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager.decision = idempotency.Decision{State: idempotency.StateCompleted, Response: stored}
+	replay := httptest.NewRequest(http.MethodPost, "/api/v1/dictionaries/publish", strings.NewReader(`{"dictionary_id":"dictionary-1"}`))
+	replay.Header.Set("X-Request-ID", "current-request")
+	replayRecorder := httptest.NewRecorder()
+	router.ServeHTTP(replayRecorder, replay)
+	var response Response
+	if err := json.Unmarshal(replayRecorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 || response.RequestID != "current-request" {
+		t.Fatalf("calls=%d response=%+v", calls, response)
+	}
+}
+
+func TestIdempotencyExecutionBypassesDynamicReadsAndHeartbeat(t *testing.T) {
+	t.Parallel()
+	manager := &fakeIdempotencyManager{decision: idempotency.Decision{State: idempotency.StateConflict}}
+	for _, route := range []string{"/api/v1/dictionaries/query", "/api/v1/dictionaries/tree", "/api/v1/dictionaries/resolve", "/api/v1/dictionaries/providers/heartbeat"} {
+		t.Run(route, func(t *testing.T) {
+			t.Parallel()
+			calls := 0
+			router := gin.New()
+			router.Use(func(c *gin.Context) {
+				c.Request = c.Request.WithContext(idempotency.WithContext(c.Request.Context(), "operation-1"))
+				c.Next()
+			}, IdempotencyExecution(manager, []string{"/api/v1/dictionaries/publish"}, slog.New(slog.NewTextHandler(io.Discard, nil))))
+			router.POST(route, func(c *gin.Context) { calls++; OK(c, nil) })
+			recorder := httptest.NewRecorder()
+			router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, route, nil))
+			if calls != 1 || recorder.Code != http.StatusOK {
+				t.Fatalf("calls=%d status=%d", calls, recorder.Code)
+			}
+		})
+	}
+	if manager.beginKey != "" {
+		t.Fatalf("unexpected idempotency begin key %q", manager.beginKey)
+	}
+}
 
 type authorizationStub struct{ err error }
 
