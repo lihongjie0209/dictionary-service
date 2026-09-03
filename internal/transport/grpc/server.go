@@ -80,6 +80,7 @@ func dictionaryGRPCRequirement(enabled bool) platformauthz.GRPCResolver {
 			dictionaryv1.DictionaryService_GetDictionary_FullMethodName:     {Resource: "dictionary.definition", Action: "read", Scope: platformauthz.ScopePrincipal},
 			dictionaryv1.DictionaryService_ListDictionaries_FullMethodName:  {Resource: "dictionary.definition", Action: "list", Scope: platformauthz.ScopePrincipal},
 			dictionaryv1.DictionaryService_UpsertItems_FullMethodName:       {Resource: "dictionary.item", Action: "update", Scope: platformauthz.ScopePrincipal},
+			dictionaryv1.DictionaryService_GetItem_FullMethodName:           {Resource: "dictionary.item", Action: "read", Scope: platformauthz.ScopePrincipal},
 			dictionaryv1.DictionaryService_DeleteItem_FullMethodName:        {Resource: "dictionary.item", Action: "delete", Scope: platformauthz.ScopePrincipal},
 			dictionaryv1.DictionaryService_PublishDictionary_FullMethodName: {Resource: "dictionary.definition", Action: "publish", Scope: platformauthz.ScopePrincipal},
 			dictionaryv1.DictionaryService_Query_FullMethodName:             {Resource: "dictionary.data", Action: "query", Scope: platformauthz.ScopePrincipal},

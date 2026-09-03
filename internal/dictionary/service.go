@@ -228,6 +228,17 @@ func (s *Service) ListDraftItemsPage(ctx context.Context, dictionaryID, keyword 
 	return Page[Item]{Items: items, Total: total, Page: page, PageSize: pageSize}, translate(err)
 }
 
+func (s *Service) GetItem(ctx context.Context, id string) (Item, error) {
+	item, err := s.repository.GetDraftItem(ctx, strings.TrimSpace(id))
+	if err != nil {
+		return Item{}, translate(err)
+	}
+	if _, err := s.authorizedStaticDictionary(ctx, item.DictionaryID); err != nil {
+		return Item{}, err
+	}
+	return item, nil
+}
+
 func (s *Service) authorizedStaticDictionary(ctx context.Context, dictionaryID string) (Dictionary, error) {
 	dictionary, err := s.repository.GetDictionaryByID(ctx, strings.TrimSpace(dictionaryID))
 	if err != nil {

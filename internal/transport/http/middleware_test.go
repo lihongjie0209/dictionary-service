@@ -111,7 +111,7 @@ func TestDictionaryHTTPRequirementCoversEveryBusinessRoute(t *testing.T) {
 	t.Parallel()
 	routes := []string{
 		"/api/v1/dictionaries/create", "/api/v1/dictionaries/update", "/api/v1/dictionaries/get", "/api/v1/dictionaries/list",
-		"/api/v1/dictionaries/items/upsert", "/api/v1/dictionaries/items/list", "/api/v1/dictionaries/items/delete",
+		"/api/v1/dictionaries/items/upsert", "/api/v1/dictionaries/items/list", "/api/v1/dictionaries/items/get", "/api/v1/dictionaries/items/delete",
 		"/api/v1/dictionaries/publish", "/api/v1/dictionaries/query", "/api/v1/dictionaries/tree", "/api/v1/dictionaries/resolve",
 		"/api/v1/dictionaries/providers/list",
 	}

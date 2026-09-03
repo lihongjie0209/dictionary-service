@@ -360,6 +360,7 @@ func dictionaryHTTPRequirement(route string) (platformauthz.Requirement, bool) {
 		"/api/v1/dictionaries/list":           {Resource: "dictionary.definition", Action: "list", Scope: platformauthz.ScopePrincipal},
 		"/api/v1/dictionaries/items/upsert":   {Resource: "dictionary.item", Action: "update", Scope: platformauthz.ScopePrincipal},
 		"/api/v1/dictionaries/items/list":     {Resource: "dictionary.item", Action: "list", Scope: platformauthz.ScopePrincipal},
+		"/api/v1/dictionaries/items/get":      {Resource: "dictionary.item", Action: "read", Scope: platformauthz.ScopePrincipal},
 		"/api/v1/dictionaries/items/delete":   {Resource: "dictionary.item", Action: "delete", Scope: platformauthz.ScopePrincipal},
 		"/api/v1/dictionaries/publish":        {Resource: "dictionary.definition", Action: "publish", Scope: platformauthz.ScopePrincipal},
 		"/api/v1/dictionaries/query":          {Resource: "dictionary.data", Action: "query", Scope: platformauthz.ScopePrincipal},

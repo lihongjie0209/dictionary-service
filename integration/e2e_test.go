@@ -138,7 +138,24 @@ func TestHTTPAndGRPCEndToEnd(t *testing.T) {
 		Version int64  `json:"version"`
 	}
 	decodeBody(t, created, &dictionaryValue)
-	postSuccess(t, baseURL+"/api/v1/dictionaries/items/upsert", "Bearer "+token, fmt.Sprintf(`{"dictionary_id":%q,"items":[{"code":"pending","name":"Pending","leaf":true,"status":"active","metadata_json":"{}"},{"code":"paid","name":"Paid","leaf":true,"status":"active","metadata_json":"{}"}]}`, dictionaryValue.ID))
+	upserted := postSuccess(t, baseURL+"/api/v1/dictionaries/items/upsert", "Bearer "+token, fmt.Sprintf(`{"dictionary_id":%q,"items":[{"code":"pending","name":"Pending","leaf":true,"status":"active","metadata_json":"{}"},{"code":"paid","name":"Paid","leaf":true,"status":"active","metadata_json":"{}"}]}`, dictionaryValue.ID))
+	var draftItems []struct {
+		ID      string `json:"id"`
+		Version int64  `json:"version"`
+	}
+	decodeBody(t, upserted, &draftItems)
+	if len(draftItems) != 2 {
+		t.Fatalf("draft items = %+v", draftItems)
+	}
+	itemResponse := postSuccess(t, baseURL+"/api/v1/dictionaries/items/get", "Bearer "+token, fmt.Sprintf(`{"id":%q}`, draftItems[0].ID))
+	var itemValue struct {
+		ID      string `json:"id"`
+		Version int64  `json:"version"`
+	}
+	decodeBody(t, itemResponse, &itemValue)
+	if itemValue.ID != draftItems[0].ID || itemValue.Version != draftItems[0].Version {
+		t.Fatalf("item detail = %+v, draft = %+v", itemValue, draftItems[0])
+	}
 	postSuccess(t, baseURL+"/api/v1/dictionaries/publish", "Bearer "+token, fmt.Sprintf(`{"dictionary_id":%q,"dictionary_version":%d,"comment":"integration"}`, dictionaryValue.ID, dictionaryValue.Version))
 	publishedMessage, err := publishedEvents.NextMsg(10 * time.Second)
 	if err != nil {

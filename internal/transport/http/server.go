@@ -69,6 +69,7 @@ func NewServer(lc fx.Lifecycle, cfg config.Config, handler *Handler, authService
 	api.POST("/dictionaries/list", handler.ListDictionaries)
 	api.POST("/dictionaries/items/upsert", handler.UpsertItems)
 	api.POST("/dictionaries/items/list", handler.ListDraftItems)
+	api.POST("/dictionaries/items/get", handler.GetItem)
 	api.POST("/dictionaries/items/delete", handler.DeleteItem)
 	api.POST("/dictionaries/publish", handler.PublishDictionary)
 	api.POST("/dictionaries/query", handler.QueryDictionary)

@@ -49,6 +49,10 @@ func (s *dictionaryServer) UpsertItems(ctx context.Context, request *dictionaryv
 	}
 	return &dictionaryv1.UpsertItemsResponse{Items: result}, err
 }
+func (s *dictionaryServer) GetItem(ctx context.Context, request *dictionaryv1.GetItemRequest) (*dictionaryv1.GetItemResponse, error) {
+	item, err := s.service.GetItem(ctx, request.GetId())
+	return &dictionaryv1.GetItemResponse{Item: dictionary.ToProtoItem(item)}, err
+}
 func (s *dictionaryServer) DeleteItem(ctx context.Context, request *dictionaryv1.DeleteItemRequest) (*dictionaryv1.DeleteItemResponse, error) {
 	return &dictionaryv1.DeleteItemResponse{}, s.service.DeleteItem(ctx, request.GetId(), request.GetVersion())
 }

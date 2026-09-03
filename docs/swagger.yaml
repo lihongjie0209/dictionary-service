@@ -143,6 +143,13 @@ definitions:
     required:
     - code
     type: object
+  httptransport.GetItemRequest:
+    properties:
+      id:
+        type: string
+    required:
+    - id
+    type: object
   httptransport.ItemListView:
     properties:
       items:
@@ -605,6 +612,34 @@ paths:
       security:
       - Bearer: []
       summary: Delete a dictionary draft item using optimistic locking
+      tags:
+      - dictionary-items
+  /api/v1/dictionaries/items/get:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Item ID
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.GetItemRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.ItemView'
+              type: object
+      security:
+      - Bearer: []
+      summary: Get an editable dictionary draft item
       tags:
       - dictionary-items
   /api/v1/dictionaries/items/list:

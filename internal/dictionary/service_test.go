@@ -67,6 +67,15 @@ func (r draftItemsRepository) ListDraftItems(context.Context, string) ([]Item, e
 	return r.items, nil
 }
 
+func (r draftItemsRepository) GetDraftItem(_ context.Context, id string) (Item, error) {
+	for _, item := range r.items {
+		if item.ID == id {
+			return item, nil
+		}
+	}
+	return Item{}, ErrNotFound
+}
+
 func (r draftItemsRepository) ListDraftItemsPage(_ context.Context, dictionaryID, keyword string, limit, offset int) ([]Item, int64, error) {
 	if r.pageCall != nil {
 		r.pageCall.dictionaryID = dictionaryID
@@ -128,6 +137,30 @@ func TestListDraftItemsPageUsesBoundedDefaults(t *testing.T) {
 	}
 	if call.dictionaryID != "dictionary-1" || call.keyword != "active" || call.limit != 20 || call.offset != 0 {
 		t.Fatalf("repository page call = %+v", call)
+	}
+}
+
+func TestGetItemReturnsAuthorizedStaticDraft(t *testing.T) {
+	t.Parallel()
+	repository := draftItemsRepository{
+		dictionary: Dictionary{ID: "dictionary-1", Kind: KindStatic},
+		items:      []Item{{ID: "item-1", DictionaryID: "dictionary-1", Code: "active", AuditFields: AuditFields{Version: 3}}},
+	}
+	service := NewService(repository, nil, nil, nil)
+	item, err := service.GetItem(systemContext(t), " item-1 ")
+	if err != nil || item.ID != "item-1" || item.Version != 3 {
+		t.Fatalf("GetItem() = (%+v, %v)", item, err)
+	}
+}
+
+func TestGetItemRejectsDynamicDictionary(t *testing.T) {
+	t.Parallel()
+	repository := draftItemsRepository{
+		dictionary: Dictionary{ID: "dictionary-1", Kind: KindDynamic},
+		items:      []Item{{ID: "item-1", DictionaryID: "dictionary-1"}},
+	}
+	if _, err := NewService(repository, nil, nil, nil).GetItem(systemContext(t), "item-1"); err == nil {
+		t.Fatal("GetItem() accepted a dynamic dictionary")
 	}
 }
 

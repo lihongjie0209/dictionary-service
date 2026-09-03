@@ -85,6 +85,9 @@ type ListDraftItemsRequest struct {
 	Page         int    `json:"page"`
 	PageSize     int    `json:"page_size"`
 }
+type GetItemRequest struct {
+	ID string `json:"id" binding:"required"`
+}
 type DeleteItemRequest struct {
 	ID      string `json:"id" binding:"required"`
 	Version int64  `json:"version" binding:"required"`
@@ -340,6 +343,24 @@ func (h *Handler) ListDraftItems(c *gin.Context) {
 	}
 	values, err := h.dictionaries.ListDraftItemsPage(c.Request.Context(), request.DictionaryID, request.Keyword, request.Page, request.PageSize)
 	respond(c, h.logger, ItemPageView{Items: itemViews(values.Items), Total: values.Total, Page: values.Page, PageSize: values.PageSize}, err)
+}
+
+// GetItem godoc
+// @Summary Get an editable dictionary draft item
+// @Tags dictionary-items
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Param request body GetItemRequest true "Item ID"
+// @Success 200 {object} Response{body=ItemView}
+// @Router /api/v1/dictionaries/items/get [post]
+func (h *Handler) GetItem(c *gin.Context) {
+	var request GetItemRequest
+	if !bind(c, h.logger, &request) {
+		return
+	}
+	value, err := h.dictionaries.GetItem(c.Request.Context(), request.ID)
+	respond(c, h.logger, itemView(value), err)
 }
 
 // DeleteItem godoc
