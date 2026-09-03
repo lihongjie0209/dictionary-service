@@ -19,6 +19,14 @@ type draftItemsRepository struct {
 	Repository
 	dictionary Dictionary
 	items      []Item
+	pageCall   *draftPageCall
+}
+
+type draftPageCall struct {
+	dictionaryID string
+	keyword      string
+	limit        int
+	offset       int
 }
 
 type scopeRepository struct {
@@ -59,6 +67,16 @@ func (r draftItemsRepository) ListDraftItems(context.Context, string) ([]Item, e
 	return r.items, nil
 }
 
+func (r draftItemsRepository) ListDraftItemsPage(_ context.Context, dictionaryID, keyword string, limit, offset int) ([]Item, int64, error) {
+	if r.pageCall != nil {
+		r.pageCall.dictionaryID = dictionaryID
+		r.pageCall.keyword = keyword
+		r.pageCall.limit = limit
+		r.pageCall.offset = offset
+	}
+	return r.items, int64(len(r.items)), nil
+}
+
 func TestValidateDictionary(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -92,6 +110,24 @@ func TestListDraftItemsReturnsEditableStaticItems(t *testing.T) {
 	items, err := service.ListDraftItems(systemContext(t), " dictionary-1 ")
 	if err != nil || len(items) != 1 || items[0].ID != "item-1" {
 		t.Fatalf("ListDraftItems() = (%+v, %v)", items, err)
+	}
+}
+
+func TestListDraftItemsPageUsesBoundedDefaults(t *testing.T) {
+	t.Parallel()
+	call := &draftPageCall{}
+	repository := draftItemsRepository{
+		dictionary: Dictionary{ID: "dictionary-1", Kind: KindStatic},
+		items:      []Item{{ID: "item-1", DictionaryID: "dictionary-1", Code: "active"}},
+		pageCall:   call,
+	}
+	service := NewService(repository, nil, nil, nil)
+	page, err := service.ListDraftItemsPage(systemContext(t), " dictionary-1 ", " active ", 0, 0)
+	if err != nil || len(page.Items) != 1 || page.Total != 1 || page.Page != 1 || page.PageSize != 20 {
+		t.Fatalf("ListDraftItemsPage() = (%+v, %v)", page, err)
+	}
+	if call.dictionaryID != "dictionary-1" || call.keyword != "active" || call.limit != 20 || call.offset != 0 {
+		t.Fatalf("repository page call = %+v", call)
 	}
 }
 

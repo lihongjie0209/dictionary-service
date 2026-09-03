@@ -26,6 +26,7 @@ type Repository interface {
 	UpsertDraftItem(context.Context, sqlx.ExtContext, Item, int64) error
 	DeleteDraftItem(context.Context, sqlx.ExtContext, string, int64, time.Time, string) error
 	ListDraftItems(context.Context, string) ([]Item, error)
+	ListDraftItemsPage(context.Context, string, string, int, int) ([]Item, int64, error)
 	CreateRelease(context.Context, sqlx.ExtContext, Release, []Item) error
 	SetPublishedVersion(context.Context, sqlx.ExtContext, string, int64, int64, time.Time, string) error
 	ListPublishedItems(context.Context, string, int64) ([]Item, error)
@@ -171,6 +172,27 @@ func (r *SQLRepository) ListDraftItems(ctx context.Context, dictionaryID string)
 	items := []Item{}
 	err := r.db.SelectContext(ctx, &items, r.db.Rebind(`SELECT `+itemColumns+` FROM dictionary_item_drafts WHERE dictionary_id=? AND status<>'deleted' ORDER BY parent_id,sort_order,id`), dictionaryID)
 	return items, err
+}
+
+func (r *SQLRepository) ListDraftItemsPage(ctx context.Context, dictionaryID, keyword string, limit, offset int) ([]Item, int64, error) {
+	where := `dictionary_id=? AND status<>'deleted'`
+	args := []any{dictionaryID}
+	if keyword != "" {
+		where += ` AND (LOWER(code) LIKE ? OR LOWER(name) LIKE ?)`
+		like := `%` + strings.ToLower(keyword) + `%`
+		args = append(args, like, like)
+	}
+	var total int64
+	if err := r.db.GetContext(ctx, &total, r.db.Rebind(`SELECT COUNT(*) FROM dictionary_item_drafts WHERE `+where), args...); err != nil {
+		return nil, 0, fmt.Errorf("count dictionary draft items: %w", err)
+	}
+	queryArgs := append(append([]any{}, args...), limit, offset)
+	items := []Item{}
+	err := r.db.SelectContext(ctx, &items, r.db.Rebind(`SELECT `+itemColumns+` FROM dictionary_item_drafts WHERE `+where+` ORDER BY parent_id,sort_order,id LIMIT ? OFFSET ?`), queryArgs...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list dictionary draft items: %w", err)
+	}
+	return items, total, nil
 }
 
 func (r *SQLRepository) CreateRelease(ctx context.Context, e sqlx.ExtContext, release Release, items []Item) error {

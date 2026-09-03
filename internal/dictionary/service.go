@@ -215,6 +215,33 @@ func (s *Service) ListDraftItems(ctx context.Context, dictionaryID string) ([]It
 	return items, translate(err)
 }
 
+func (s *Service) ListDraftItemsPage(ctx context.Context, dictionaryID, keyword string, page, pageSize int) (Page[Item], error) {
+	dictionary, err := s.authorizedStaticDictionary(ctx, dictionaryID)
+	if err != nil {
+		return Page[Item]{}, err
+	}
+	page, pageSize, err = pagination(page, pageSize)
+	if err != nil {
+		return Page[Item]{}, err
+	}
+	items, total, err := s.repository.ListDraftItemsPage(ctx, dictionary.ID, strings.TrimSpace(keyword), pageSize, (page-1)*pageSize)
+	return Page[Item]{Items: items, Total: total, Page: page, PageSize: pageSize}, translate(err)
+}
+
+func (s *Service) authorizedStaticDictionary(ctx context.Context, dictionaryID string) (Dictionary, error) {
+	dictionary, err := s.repository.GetDictionaryByID(ctx, strings.TrimSpace(dictionaryID))
+	if err != nil {
+		return Dictionary{}, translate(err)
+	}
+	if err := s.authorizeScope(ctx, dictionary.TenantID, dictionary.ApplicationID, false); err != nil {
+		return Dictionary{}, err
+	}
+	if dictionary.Kind != KindStatic {
+		return Dictionary{}, apperror.Conflict("dynamic dictionaries do not have draft items", nil)
+	}
+	return dictionary, nil
+}
+
 func (s *Service) DeleteItem(ctx context.Context, id string, expected int64) error {
 	actor, err := actor(ctx)
 	if err != nil {

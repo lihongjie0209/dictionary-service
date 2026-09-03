@@ -150,6 +150,19 @@ definitions:
           $ref: '#/definitions/httptransport.ItemView'
         type: array
     type: object
+  httptransport.ItemPageView:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/httptransport.ItemView'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+    type: object
   httptransport.ItemView:
     properties:
       code:
@@ -204,6 +217,12 @@ definitions:
     properties:
       dictionary_id:
         type: string
+      keyword:
+        type: string
+      page:
+        type: integer
+      page_size:
+        type: integer
     required:
     - dictionary_id
     type: object
@@ -637,7 +656,7 @@ paths:
             - $ref: '#/definitions/httptransport.Response'
             - properties:
                 body:
-                  $ref: '#/definitions/httptransport.ItemListView'
+                  $ref: '#/definitions/httptransport.ItemPageView'
               type: object
         "409":
           description: 'Code 30009: stale item version'

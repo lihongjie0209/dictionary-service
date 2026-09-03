@@ -267,7 +267,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "body": {
-                                            "$ref": "#/definitions/httptransport.ItemListView"
+                                            "$ref": "#/definitions/httptransport.ItemPageView"
                                         }
                                     }
                                 }
@@ -1176,6 +1176,26 @@ const docTemplate = `{
                 }
             }
         },
+        "httptransport.ItemPageView": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httptransport.ItemView"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "httptransport.ItemView": {
             "type": "object",
             "properties": {
@@ -1260,6 +1280,15 @@ const docTemplate = `{
             "properties": {
                 "dictionary_id": {
                     "type": "string"
+                },
+                "keyword": {
+                    "type": "string"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
                 }
             }
         },

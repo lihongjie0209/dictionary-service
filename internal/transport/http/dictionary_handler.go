@@ -81,6 +81,9 @@ type UpsertItemsRequest struct {
 }
 type ListDraftItemsRequest struct {
 	DictionaryID string `json:"dictionary_id" binding:"required"`
+	Keyword      string `json:"keyword"`
+	Page         int    `json:"page"`
+	PageSize     int    `json:"page_size"`
 }
 type DeleteItemRequest struct {
 	ID      string `json:"id" binding:"required"`
@@ -172,6 +175,12 @@ type DictionaryPageView struct {
 }
 type ItemListView struct {
 	Items []ItemView `json:"items"`
+}
+type ItemPageView struct {
+	Items    []ItemView `json:"items"`
+	Total    int64      `json:"total"`
+	Page     int        `json:"page"`
+	PageSize int        `json:"page_size"`
 }
 type PublishView struct {
 	ReleaseVersion int64      `json:"release_version"`
@@ -299,7 +308,7 @@ func (h *Handler) ListDictionaries(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param request body UpsertItemsRequest true "Draft items and expected versions"
-// @Success 200 {object} Response{body=ItemListView}
+// @Success 200 {object} Response{body=ItemPageView}
 // @Failure 409 {object} Response "Code 30009: stale item version"
 // @Router /api/v1/dictionaries/items/upsert [post]
 func (h *Handler) UpsertItems(c *gin.Context) {
@@ -329,8 +338,8 @@ func (h *Handler) ListDraftItems(c *gin.Context) {
 	if !bind(c, h.logger, &request) {
 		return
 	}
-	values, err := h.dictionaries.ListDraftItems(c.Request.Context(), request.DictionaryID)
-	respond(c, h.logger, gin.H{"items": itemViews(values)}, err)
+	values, err := h.dictionaries.ListDraftItemsPage(c.Request.Context(), request.DictionaryID, request.Keyword, request.Page, request.PageSize)
+	respond(c, h.logger, ItemPageView{Items: itemViews(values.Items), Total: values.Total, Page: values.Page, PageSize: values.PageSize}, err)
 }
 
 // DeleteItem godoc
